@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import { GuestRewardsPrompt } from '../components/RewardsPrompt'
 import { formatPrice } from '../data/products'
 import { useCart } from '../context/CartContext'
 import { getCheckoutSession } from '../lib/checkout'
@@ -37,7 +38,17 @@ export default function CheckoutSuccess() {
           {details.amountTotal != null && (
             <p className="checkout-total">Total paid: {formatPrice(details.amountTotal)}</p>
           )}
+          {details.earnedPoints && details.pointsEarned > 0 && (
+            <p className="form-success">
+              You earned {details.pointsEarned} rewards point
+              {details.pointsEarned === 1 ? '' : 's'}.
+            </p>
+          )}
         </div>
+      )}
+
+      {details && details.paymentStatus === 'paid' && !details.earnedPoints && (
+        <GuestRewardsPrompt returnTo="/store" compact />
       )}
 
       <Link to="/store" className="btn btn-primary">

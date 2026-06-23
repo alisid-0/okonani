@@ -1,24 +1,59 @@
 import react from '@vitejs/plugin-react'
-import dotenv from 'dotenv'
-import { defineConfig } from 'vite'
-import { createStripeApp } from './server/createApp.js'
+import { defineConfig, loadEnv } from 'vite'
 
-dotenv.config()
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const projectId = env.VITE_FIREBASE_PROJECT_ID || 'okonani-dff36'
+  const functionsOrigin = `https://us-central1-${projectId}.cloudfunctions.net`
+  const useProxy = env.VITE_USE_FIREBASE_EMULATORS !== 'true'
 
-export default defineConfig({
-  plugins: [
-    react(),
-    {
-      name: 'stripe-api',
-      configureServer(server) {
-        try {
-          const app = createStripeApp()
-          server.middlewares.use(app)
-          console.log('[stripe-api] Payment routes mounted at /api/*')
-        } catch (err) {
-          console.error('[stripe-api]', err instanceof Error ? err.message : err)
+  return {
+    plugins: [react()],
+    server: useProxy
+      ? {
+          proxy: {
+            '/api/admin/check-access': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminCheckAccess',
+            },
+            '/api/admin/products/save': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminSaveProduct',
+            },
+            '/api/admin/products/delete': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminDeleteProduct',
+            },
+            '/api/admin/media/upload': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminUploadMedia',
+            },
+            '/api/create-checkout-session': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/createCheckoutSession',
+            },
+            '/api/checkout-session': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: (path) => path.replace('/api/checkout-session', '/getCheckoutSession'),
+            },
+            '/api/rewards/redeem': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/redeemPoints',
+            },
+            '/api/rewards/summary': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/getRewardsSummary',
+            },
+          },
         }
-      },
-    },
-  ],
+      : undefined,
+  }
 })

@@ -1,6 +1,0 @@
-[
-  { "id": 1, "name": "Product One", "priceInCents": 2400 },
-  { "id": 2, "name": "Product Two", "priceInCents": 3600 },
-  { "id": 3, "name": "Product Three", "priceInCents": 1800 },
-  { "id": 4, "name": "Product Four", "priceInCents": 4200 }
-]

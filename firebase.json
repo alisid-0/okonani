@@ -1,0 +1,103 @@
+{
+  "hosting": {
+    "public": "dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "/api/create-checkout-session",
+        "function": {
+          "functionId": "createCheckoutSession",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/checkout-session",
+        "function": {
+          "functionId": "getCheckoutSession",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/rewards/redeem",
+        "function": {
+          "functionId": "redeemPoints",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/rewards/summary",
+        "function": {
+          "functionId": "getRewardsSummary",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/check-access",
+        "function": {
+          "functionId": "adminCheckAccess",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/products/save",
+        "function": {
+          "functionId": "adminSaveProduct",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/products/delete",
+        "function": {
+          "functionId": "adminDeleteProduct",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/media/upload",
+        "function": {
+          "functionId": "adminUploadMedia",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": ["node_modules", ".git", "firebase-debug.log", "firebase-debug.*.log"]
+    }
+  ],
+  "emulators": {
+    "hosting": {
+      "port": 5000
+    },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "auth": {
+      "port": 9099
+    },
+    "storage": {
+      "port": 9199
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  }
+}

@@ -5,27 +5,27 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:client": "vite",
-    "dev:server": "node --watch server/index.js",
+    "emulators": "firebase emulators:start",
+    "bootstrap:admins": "node scripts/bootstrapAdmins.mjs",
+    "secrets:push": "node scripts/pushSecrets.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "server": "node server/index.js"
+    "deploy": "npm run build && npm run secrets:push && firebase deploy"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9.2.1",
+    "firebase-admin": "^14.0.0",
+    "firebase-tools": "^15.19.1",
     "typescript": "~6.0.2",
     "vite": "^6.4.2"
   },
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
+    "firebase": "^12.14.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1",
-    "stripe": "^22.1.1"
+    "react-router-dom": "^7.15.1"
   }
 }

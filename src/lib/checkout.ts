@@ -1,6 +1,18 @@
 type CheckoutItem = {
-  id: number
+  stripePriceId: string
   quantity: number
+}
+
+type CheckoutOptions = {
+  rewardId?: string
+  promotionCode?: string
+  authToken?: string | null
+}
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
+
+function apiUrl(path: string): string {
+  return `${apiBaseUrl}${path}`
 }
 
 async function parseJsonResponse(res: Response): Promise<Record<string, unknown>> {
@@ -8,7 +20,7 @@ async function parseJsonResponse(res: Response): Promise<Record<string, unknown>
 
   if (!text.trim()) {
     throw new Error(
-      'Payment API returned no data. Restart with npm run dev and ensure STRIPE_SECRET_KEY is set in .env.',
+      'Payment API returned no data. Start the Firebase emulators and check VITE_API_BASE_URL.',
     )
   }
 
@@ -19,11 +31,30 @@ async function parseJsonResponse(res: Response): Promise<Record<string, unknown>
   }
 }
 
-export async function createCheckoutSession(items: CheckoutItem[]): Promise<string> {
-  const res = await fetch('/api/create-checkout-session', {
+export async function createCheckoutSession(
+  items: CheckoutItem[],
+  options: CheckoutOptions = {},
+): Promise<string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+  if (options.authToken) {
+    headers['X-Firebase-Auth'] = options.authToken
+  }
+
+  const body: Record<string, unknown> = { items }
+
+  if (options.rewardId) {
+    body.rewardId = options.rewardId
+  }
+
+  if (options.promotionCode?.trim()) {
+    body.promotionCode = options.promotionCode.trim()
+  }
+
+  const res = await fetch(apiUrl('/api/create-checkout-session'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
+    headers,
+    body: JSON.stringify(body),
   })
 
   const data = await parseJsonResponse(res)
@@ -44,10 +75,12 @@ export type CheckoutSessionDetails = {
   paymentStatus: string
   email: string | null
   amountTotal: number | null
+  pointsEarned: number
+  earnedPoints: boolean
 }
 
 export async function getCheckoutSession(sessionId: string): Promise<CheckoutSessionDetails> {
-  const res = await fetch(`/api/checkout-session?session_id=${encodeURIComponent(sessionId)}`)
+  const res = await fetch(apiUrl(`/api/checkout-session?session_id=${encodeURIComponent(sessionId)}`))
   const data = await parseJsonResponse(res)
 
   if (!res.ok) {

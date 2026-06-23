@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /reviews/{reviewUserId} {
+        allow read: if true;
+        allow create, update: if isSignedIn()
+          && request.auth.uid == reviewUserId
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && request.resource.data.body is string
+          && request.resource.data.body.size() >= 3
+          && request.resource.data.body.size() <= 2000
+          && request.resource.data.author is string
+          && request.resource.data.author.size() >= 1
+          && request.resource.data.author.size() <= 80;
+        allow delete: if isAdmin() || isOwner(reviewUserId);
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.email is string
+        && request.resource.data.notificationsEnabled is bool
+        && (!('points' in request.resource.data) || request.resource.data.points == 0);
+      allow update: if isOwner(userId)
+        && request.resource.data.email is string
+        && request.resource.data.notificationsEnabled is bool
+        && (!('points' in request.resource.data) || request.resource.data.points == resource.data.points);
+      allow delete: if isAdmin();
+
+      match /rewards/{rewardId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false;
+      }
+
+      match /pointLedger/{entryId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /contactMessages/{messageId} {
+      allow create: if request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.email is string
+        && request.resource.data.email.size() >= 3
+        && request.resource.data.email.size() <= 120
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 3
+        && request.resource.data.message.size() <= 2000
+        && (!('read' in request.resource.data) || request.resource.data.read == false);
+      allow read, delete: if isAdmin();
+      allow update: if isAdmin()
+        && (!('read' in request.resource.data) || request.resource.data.read is bool);
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /admins/{adminId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
