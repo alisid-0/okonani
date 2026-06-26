@@ -32,7 +32,13 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
     <div className="product-gallery">
       <div className="product-gallery-stage">
         {activeItem.type === 'image' && (
-          <img src={activeItem.url} alt={activeItem.alt || productName} className="product-gallery-image" />
+          <img
+            src={activeItem.url}
+            alt={activeItem.alt || productName}
+            className="product-gallery-image"
+            decoding="async"
+            fetchPriority="high"
+          />
         )}
 
         {activeItem.type === 'video' && isYoutubeUrl(activeItem.url) && youtubeEmbedUrl(activeItem.url) && (
@@ -63,7 +69,7 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
               aria-label={`Show media ${index + 1}`}
             >
               {item.type === 'image' ?
-                <img src={item.url} alt="" />
+                <img src={item.url} alt="" loading="lazy" decoding="async" />
               : <span className="product-gallery-thumb-video">▶</span>}
             </button>
           ))}

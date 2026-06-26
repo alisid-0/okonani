@@ -43,6 +43,7 @@ export default function Store() {
 
       {!user && <GuestRewardsPrompt returnTo="/store" compact />}
 
+      <div className="store-body">
       <div className="store-filters" role="tablist" aria-label="Product categories">
         <button
           type="button"
@@ -87,6 +88,7 @@ export default function Store() {
             onAdd={() => addItem(product)}
           />
         ))}
+      </div>
       </div>
     </div>
   )

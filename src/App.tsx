@@ -1,39 +1,51 @@
+import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import AdminRoute from './components/AdminRoute'
 import Layout from './components/Layout'
-import About from './pages/About'
-import Account from './pages/Account'
-import Admin from './pages/Admin'
-import AdminLogin from './pages/AdminLogin'
-import Cart from './pages/Cart'
-import Contact from './pages/Contact'
 import Home from './pages/Home'
-import CheckoutCancel from './pages/CheckoutCancel'
-import CheckoutSuccess from './pages/CheckoutSuccess'
-import Login from './pages/Login'
-import ProductDetail from './pages/ProductDetail'
-import Store from './pages/Store'
+
+const About = lazy(() => import('./pages/About'))
+const Account = lazy(() => import('./pages/Account'))
+const Admin = lazy(() => import('./pages/Admin'))
+const AdminLogin = lazy(() => import('./pages/AdminLogin'))
+const Cart = lazy(() => import('./pages/Cart'))
+const Contact = lazy(() => import('./pages/Contact'))
+const CheckoutCancel = lazy(() => import('./pages/CheckoutCancel'))
+const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'))
+const Login = lazy(() => import('./pages/Login'))
+const ProductDetail = lazy(() => import('./pages/ProductDetail'))
+const Store = lazy(() => import('./pages/Store'))
+
+function PageLoader() {
+  return (
+    <div className="page">
+      <p className="page-loader">Loading…</p>
+    </div>
+  )
+}
 
 export default function App() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route index element={<Home />} />
-        <Route path="store" element={<Store />} />
-        <Route path="store/:productId" element={<ProductDetail />} />
-        <Route path="about" element={<About />} />
-        <Route path="contact" element={<Contact />} />
-        <Route path="cart" element={<Cart />} />
-        <Route path="login" element={<Login />} />
-        <Route path="account" element={<Account />} />
-        <Route path="checkout/success" element={<CheckoutSuccess />} />
-        <Route path="checkout/cancel" element={<CheckoutCancel />} />
-      </Route>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<Home />} />
+          <Route path="store" element={<Store />} />
+          <Route path="store/:productId" element={<ProductDetail />} />
+          <Route path="about" element={<About />} />
+          <Route path="contact" element={<Contact />} />
+          <Route path="cart" element={<Cart />} />
+          <Route path="login" element={<Login />} />
+          <Route path="account" element={<Account />} />
+          <Route path="checkout/success" element={<CheckoutSuccess />} />
+          <Route path="checkout/cancel" element={<CheckoutCancel />} />
+        </Route>
 
-      <Route path="admin/login" element={<AdminLogin />} />
-      <Route element={<AdminRoute />}>
-        <Route path="admin" element={<Admin />} />
-      </Route>
-    </Routes>
+        <Route path="admin/login" element={<AdminLogin />} />
+        <Route element={<AdminRoute />}>
+          <Route path="admin" element={<Admin />} />
+        </Route>
+      </Routes>
+    </Suspense>
   )
 }

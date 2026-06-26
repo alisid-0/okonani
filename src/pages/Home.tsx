@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import img from '../assets/hero/Untitled_Artwork.png'
+import img from '../assets/hero/Untitled_Artwork.webp'
 import { homeCategories, useCategories } from '../data/categories'
 import { formatPrice, getProductCover, useProducts, type Product } from '../data/products'
 import { useCart } from '../context/CartContext'
@@ -49,7 +49,15 @@ export default function Home() {
   return (
     <>
       <section className="hero hero-large">
-        <img className="hero-image" src={img} alt="Welcome to my shop" />
+        <img
+          className="hero-image"
+          src={img}
+          alt="Welcome to my shop"
+          width={1400}
+          height={788}
+          decoding="async"
+          fetchPriority="high"
+        />
       </section>
 
       {categoryRows.length > 0 && (

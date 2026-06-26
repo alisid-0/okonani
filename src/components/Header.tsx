@@ -72,6 +72,14 @@ export default function Header() {
 
   return (
     <header className="header">
+      <div className="header-chrome-row" aria-hidden="true">
+        <div className="window-chrome">
+          <span className="window-btn window-btn-minimize" />
+          <span className="window-btn window-btn-maximize" />
+          <span className="window-btn window-btn-close" />
+        </div>
+      </div>
+
       <div className="header-inner">
         <div className="header-top-row">
           <button

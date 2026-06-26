@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import PageSheet from '../components/PageSheet'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/products'
 import { getUserProfile, setNotificationPreference } from '../lib/userApi'
@@ -107,6 +108,7 @@ export default function Account() {
     <div className="page page-narrow">
       <PageHeader title="Your account" subtitle={user.email ?? ''} />
 
+      <PageSheet className="page-stack">
       <section className="account-card">
         <h2>Rewards points</h2>
         <p className="account-copy">
@@ -188,6 +190,7 @@ export default function Account() {
           Log out
         </button>
       </div>
+      </PageSheet>
     </div>
   )
 }

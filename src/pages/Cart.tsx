@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import PageSheet from '../components/PageSheet'
 import { GuestCheckoutGate } from '../components/RewardsPrompt'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
@@ -89,12 +90,14 @@ export default function Cart() {
       <div className="page cart-page">
         <PageHeader title="Shopping cart" subtitle="Your cart is empty." />
 
+        <PageSheet>
         <div className="cart-empty">
           <p>No items in your cart yet.</p>
           <Link to="/store" className="btn btn-primary">
             Continue shopping
           </Link>
         </div>
+        </PageSheet>
       </div>
     )
   }

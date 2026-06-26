@@ -82,20 +82,104 @@ body {
   filter: none;
 }
 
-/* Header — soft, not boxed */
+/* Header — soft window chrome */
 
 .header {
-  background: rgba(255, 255, 254, 0.82);
-  border-bottom: var(--soft-border);
-  box-shadow: 0 4px 16px rgba(255, 200, 221, 0.06);
+  background:
+    linear-gradient(180deg, rgba(214, 232, 255, 0.92) 0%, rgba(255, 255, 254, 0.88) 2.75rem),
+    rgba(255, 255, 254, 0.82);
+  border-bottom: 1px solid rgba(120, 156, 214, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 4px 16px rgba(255, 200, 221, 0.06);
   backdrop-filter: blur(8px);
+}
+
+.window-chrome {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.window-btn {
+  position: relative;
+  display: block;
+  width: 1.45rem;
+  height: 1.2rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 1px 1px rgba(0, 0, 0, 0.12);
+}
+
+.window-btn-minimize {
+  background: linear-gradient(180deg, #9ec8ff 0%, #5b9de8 42%, #3a7fd4 100%);
+  border-color: #2a5ea0;
+}
+
+.window-btn-minimize::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 0.55rem;
+  height: 2px;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.25);
+  border-radius: 1px;
+}
+
+.window-btn-maximize {
+  background: linear-gradient(180deg, #9ec8ff 0%, #5b9de8 42%, #3a7fd4 100%);
+  border-color: #2a5ea0;
+}
+
+.window-btn-maximize::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid #fff;
+  box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.2);
+  border-radius: 1px;
+}
+
+.window-btn-close {
+  background: linear-gradient(180deg, #ffaea6 0%, #e96a62 45%, #d44b42 100%);
+  border-color: #9c2f28;
+}
+
+.window-btn-close::before,
+.window-btn-close::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.55rem;
+  height: 1.5px;
+  background: #fff;
+  border-radius: 1px;
+  box-shadow: 0 0.5px 0 rgba(0, 0, 0, 0.2);
+}
+
+.window-btn-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.window-btn-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .header-inner::before,
 .header-inner::after {
   content: '';
   position: absolute;
-  top: 0.4rem;
+  top: 2.15rem;
   width: 3rem;
   height: 0.95rem;
   border-radius: 1px;
@@ -327,7 +411,6 @@ body {
   transform: rotate(-1deg);
 }
 
-.product-reviews,
 .review-form {
   border: var(--soft-border);
   border-radius: calc(var(--radius) + 6px);

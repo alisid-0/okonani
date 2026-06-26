@@ -68,6 +68,11 @@ export async function submitContactMessage(input: {
   })
 }
 
+export async function hasPurchasedProduct(userId: string, productId: string): Promise<boolean> {
+  const snapshot = await getDoc(doc(db, 'users', userId, 'purchases', productId))
+  return snapshot.exists()
+}
+
 export async function submitProductReview(
   productId: string,
   userId: string,

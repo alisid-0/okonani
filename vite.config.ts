@@ -9,6 +9,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/firebase')) return 'firebase'
+            if (id.includes('node_modules/react-router') || id.includes('node_modules/react-dom')) {
+              return 'vendor'
+            }
+          },
+        },
+      },
+    },
     server: useProxy
       ? {
           proxy: {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import PageSheet from '../components/PageSheet'
 import { GuestRewardsPrompt } from '../components/RewardsPrompt'
 import { formatPrice } from '../data/products'
 import { useCart } from '../context/CartContext'
@@ -30,6 +31,7 @@ export default function CheckoutSuccess() {
     <div className="page page-narrow">
       <PageHeader title="Thank you" subtitle="Your payment was received." />
 
+      <PageSheet className="page-stack">
       {error && <p className="form-error">{error}</p>}
 
       {details && (
@@ -54,6 +56,7 @@ export default function CheckoutSuccess() {
       <Link to="/store" className="btn btn-primary">
         Continue shopping
       </Link>
+      </PageSheet>
     </div>
   )
 }

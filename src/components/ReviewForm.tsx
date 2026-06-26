@@ -1,7 +1,7 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { submitProductReview } from '../lib/userApi'
+import { hasPurchasedProduct, submitProductReview } from '../lib/userApi'
 
 type ReviewFormProps = {
   productId: string
@@ -14,6 +14,39 @@ export default function ReviewForm({ productId, onSubmitted }: ReviewFormProps) 
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [purchaseLoading, setPurchaseLoading] = useState(true)
+  const [hasPurchased, setHasPurchased] = useState(false)
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadPurchaseStatus() {
+      if (!user) {
+        if (!ignore) {
+          setHasPurchased(false)
+          setPurchaseLoading(false)
+        }
+        return
+      }
+
+      setPurchaseLoading(true)
+
+      try {
+        const purchased = await hasPurchasedProduct(user.uid, productId)
+        if (!ignore) setHasPurchased(purchased)
+      } catch {
+        if (!ignore) setHasPurchased(false)
+      } finally {
+        if (!ignore) setPurchaseLoading(false)
+      }
+    }
+
+    loadPurchaseStatus()
+
+    return () => {
+      ignore = true
+    }
+  }, [user, productId])
 
   if (!user) {
     return (
@@ -21,7 +54,19 @@ export default function ReviewForm({ productId, onSubmitted }: ReviewFormProps) 
         <Link to="/login" state={{ from: `/store/${productId}` }}>
           Sign in
         </Link>{' '}
-        to leave a review.
+        to leave a review after you purchase this item.
+      </p>
+    )
+  }
+
+  if (purchaseLoading) {
+    return <p className="product-review-signin">Checking purchase history…</p>
+  }
+
+  if (!hasPurchased) {
+    return (
+      <p className="product-review-purchase-note">
+        Only customers who have purchased this item can leave a review.
       </p>
     )
   }

@@ -53,6 +53,7 @@ async function awardPointsForCheckoutSession(stripe, session) {
   const orderRef = getDb().collection('orders').doc(session.id)
   const existingOrder = await orderRef.get()
   if (existingOrder.exists && existingOrder.data().pointsAwarded != null) {
+    await recordPurchasesFromCheckoutSession(stripe, session, userId)
     return { awarded: existingOrder.data().pointsAwarded }
   }
 
@@ -108,7 +109,69 @@ async function awardPointsForCheckoutSession(stripe, session) {
     await markRewardsUsedFromSession(stripe, session, userId)
   }
 
+  await recordPurchasesFromCheckoutSession(stripe, session, userId)
+
   return { awarded: pointsEarned }
+}
+
+async function recordPurchasesFromCheckoutSession(stripe, session, userId) {
+  if (!userId || session.payment_status !== 'paid') return
+
+  const expanded = await stripe.checkout.sessions.retrieve(session.id, {
+    expand: ['line_items.data.price'],
+  })
+
+  const lineItems = expanded.line_items?.data ?? []
+  const productIds = new Set()
+
+  for (const item of lineItems) {
+    const price = item.price
+    const priceId = typeof price === 'object' && price?.id ? price.id : null
+    if (!priceId) continue
+
+    const snapshot = await getDb()
+      .collection('products')
+      .where('stripePriceId', '==', priceId)
+      .limit(1)
+      .get()
+
+    if (!snapshot.empty) {
+      productIds.add(snapshot.docs[0].id)
+    }
+  }
+
+  if (productIds.size === 0) return
+
+  const batch = getDb().batch()
+  const purchasedAt = FieldValue.serverTimestamp()
+
+  for (const productId of productIds) {
+    const purchaseRef = getDb()
+      .collection('users')
+      .doc(userId)
+      .collection('purchases')
+      .doc(productId)
+
+    batch.set(
+      purchaseRef,
+      {
+        productId,
+        orderId: session.id,
+        purchasedAt,
+      },
+      { merge: true },
+    )
+  }
+
+  batch.set(
+    getDb().collection('orders').doc(session.id),
+    {
+      productIds: [...productIds],
+    },
+    { merge: true },
+  )
+
+  await batch.commit()
 }
 
 async function markRewardUsed(userId, rewardId, checkoutSessionId) {
@@ -262,4 +325,5 @@ module.exports = {
   listActiveRewards,
   awardPointsForCheckoutSession,
   redeemPointsForCoupon,
+  recordPurchasesFromCheckoutSession,
 }

@@ -27,6 +27,7 @@ service cloud.firestore {
         allow read: if true;
         allow create, update: if isSignedIn()
           && request.auth.uid == reviewUserId
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid)/purchases/$(productId))
           && request.resource.data.userId == request.auth.uid
           && request.resource.data.rating is int
           && request.resource.data.rating >= 1
@@ -59,6 +60,11 @@ service cloud.firestore {
       }
 
       match /pointLedger/{entryId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if false;
+      }
+
+      match /purchases/{productId} {
         allow read: if isOwner(userId) || isAdmin();
         allow write: if false;
       }

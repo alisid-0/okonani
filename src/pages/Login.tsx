@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import PageSheet from '../components/PageSheet'
 import { useAuth } from '../context/AuthContext'
 
 type AuthMode = 'signin' | 'signup'
@@ -56,62 +57,64 @@ export default function Login() {
         subtitle="Save your reviews and get notified about new products."
       />
 
-      <div className="auth-tabs">
-        <button
-          type="button"
-          className={`auth-tab ${mode === 'signin' ? 'is-active' : ''}`}
-          onClick={() => setMode('signin')}
-        >
-          Sign in
-        </button>
-        <button
-          type="button"
-          className={`auth-tab ${mode === 'signup' ? 'is-active' : ''}`}
-          onClick={() => setMode('signup')}
-        >
-          Sign up
-        </button>
-      </div>
+      <PageSheet>
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={`auth-tab ${mode === 'signin' ? 'is-active' : ''}`}
+            onClick={() => setMode('signin')}
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            className={`auth-tab ${mode === 'signup' ? 'is-active' : ''}`}
+            onClick={() => setMode('signup')}
+          >
+            Sign up
+          </button>
+        </div>
 
-      <form className="auth-form" onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            minLength={6}
-            required
-          />
-        </label>
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              minLength={6}
+              required
+            />
+          </label>
 
-        {error && <p className="form-error">{error}</p>}
+          {error && <p className="form-error">{error}</p>}
 
-        <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
-          {loading ?
-            mode === 'signin' ?
-              'Signing in…'
-            : 'Creating account…'
-          : mode === 'signin' ?
-            'Sign in'
-          : 'Create account'}
-        </button>
-      </form>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+            {loading ?
+              mode === 'signin' ?
+                'Signing in…'
+              : 'Creating account…'
+            : mode === 'signin' ?
+              'Sign in'
+            : 'Create account'}
+          </button>
+        </form>
 
-      <p className="auth-footer">
-        <Link to="/store">Back to store</Link>
-      </p>
+        <p className="auth-footer">
+          <Link to="/store">Back to store</Link>
+        </p>
+      </PageSheet>
     </div>
   )
 }

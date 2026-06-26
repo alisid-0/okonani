@@ -6,6 +6,7 @@ import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
 import './index.css'
 import './craft-theme.css'
+import './pages-art.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
