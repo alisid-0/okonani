@@ -92,10 +92,22 @@ export default function Admin() {
     loadProducts()
   }, [])
 
+  useEffect(() => {
+    if (!form.id || categories.length === 0) return
+    if (form.category && categories.some((category) => category.id === form.category)) return
+
+    setForm((prev) => ({ ...prev, category: categories[0].id }))
+  }, [categories, form.id, form.category])
+
   async function selectProduct(product: AdminProduct) {
     setTab('details')
     setMessage(null)
     setError(null)
+
+    const resolvedCategory =
+      product.category && categories.some((category) => category.id === product.category) ?
+        product.category
+      : categories[0]?.id ?? ''
 
     setForm({
       id: product.id,
@@ -105,7 +117,7 @@ export default function Admin() {
       price: (product.priceInCents / 100).toFixed(2),
       active: product.active,
       sortOrder: String(product.sortOrder),
-      category: product.category,
+      category: resolvedCategory,
       media: product.media.length > 0 ? product.media : [],
     })
   }
@@ -128,6 +140,12 @@ export default function Admin() {
     setMessage(null)
 
     const priceInCents = dollarsToCents(form.price)
+
+    if (!form.category.trim()) {
+      setError('Choose a category before saving.')
+      setSaving(false)
+      return
+    }
 
     try {
       const data = await saveAdminProduct({
@@ -216,7 +234,12 @@ export default function Admin() {
   const cover = getProductCover({ media: form.media })
 
   function categoryName(categoryId: string): string {
-    return categories.find((category) => category.id === categoryId)?.name ?? 'Uncategorized'
+    if (!categoryId) return 'No category'
+    return categories.find((category) => category.id === categoryId)?.name ?? 'Unknown category'
+  }
+
+  function isCategoryMissing(categoryId: string): boolean {
+    return !categoryId || !categories.some((category) => category.id === categoryId)
   }
 
   return (
@@ -283,7 +306,7 @@ export default function Admin() {
                 </span>
                 <span className="admin-sidebar-copy">
                   <strong>{product.name}</strong>
-                  <span>
+                  <span className={isCategoryMissing(product.category) ? 'admin-warning-text' : undefined}>
                     {categoryName(product.category)} · {product.active ? 'Live' : 'Hidden'}
                   </span>
                 </span>
@@ -396,7 +419,9 @@ export default function Admin() {
                   <select
                     value={form.category}
                     onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+                    required
                   >
+                    {categories.length === 0 && <option value="">No categories yet</option>}
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}

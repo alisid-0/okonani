@@ -1,19 +1,35 @@
+import aboutArt from '../assets/hero/Untitled_Artwork(2).png'
 import PageHeader from '../components/PageHeader'
 
 export default function About() {
   return (
     <div className="page">
-      <PageHeader title="About" subtitle="Learn more about okonani." />
+      <PageHeader title="About" subtitle="A little about me and the charms I make." />
 
-      <div className="content-block">
-        <p>
-          okonani is an online store skeleton built with Vite and React. This page is a placeholder
-          for your brand story, mission, and team information.
-        </p>
-        <p>
-          Replace this copy with details about your products, values, and what makes your shop
-          unique.
-        </p>
+      <div className="about-layout">
+        <img
+          src={aboutArt}
+          alt="okonani mascot"
+          className="about-illustration"
+          loading="lazy"
+        />
+
+        <div className="content-block">
+          <p>
+            Hi! I&apos;m the person behind okonani, and I make every charm you see here by hand.
+            What started as something small for myself grew into a little shop where I get to share
+            pieces I&apos;m genuinely excited about.
+          </p>
+          <p>
+            I&apos;m Palestinian, and that part of who I am shows up in how I work: patient, careful,
+            and proud of the details. I want each charm to feel personal, like something you picked
+            out because it actually means something to you.
+          </p>
+          <p>
+            Thank you for being here. Every order supports an independent maker, and I&apos;m so
+            grateful you stopped by.
+          </p>
+        </div>
       </div>
     </div>
   )

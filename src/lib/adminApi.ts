@@ -146,6 +146,10 @@ export async function listAdminCategories(): Promise<StoreCategory[]> {
         description: typeof data.description === 'string' ? data.description : '',
         showOnHome: data.showOnHome === true,
         showInStore: data.showInStore !== false,
+        homeProductLimit:
+          typeof data.homeProductLimit === 'number' && data.homeProductLimit > 0 ?
+            Math.min(24, Math.round(data.homeProductLimit))
+          : 4,
         sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : 0,
         active: data.active !== false,
       } satisfies StoreCategory
@@ -160,6 +164,7 @@ export async function saveAdminCategory(input: {
   description: string
   showOnHome: boolean
   showInStore: boolean
+  homeProductLimit: number
   sortOrder: number
   active: boolean
 }): Promise<void> {
@@ -175,6 +180,7 @@ export async function saveAdminCategory(input: {
       description: input.description.trim(),
       showOnHome: input.showOnHome,
       showInStore: input.showInStore,
+      homeProductLimit: Math.min(24, Math.max(1, Math.round(input.homeProductLimit))),
       sortOrder: input.sortOrder,
       active: input.active,
       updatedAt: serverTimestamp(),

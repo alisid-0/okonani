@@ -12,6 +12,7 @@ type CategoryForm = {
   description: string
   showOnHome: boolean
   showInStore: boolean
+  homeProductLimit: string
   sortOrder: string
   active: boolean
 }
@@ -22,6 +23,7 @@ const emptyCategoryForm = (): CategoryForm => ({
   description: '',
   showOnHome: true,
   showInStore: true,
+  homeProductLimit: '4',
   sortOrder: '0',
   active: true,
 })
@@ -72,6 +74,7 @@ export default function AdminCategories() {
       description: category.description,
       showOnHome: category.showOnHome,
       showInStore: category.showInStore,
+      homeProductLimit: String(category.homeProductLimit),
       sortOrder: String(category.sortOrder),
       active: category.active,
     })
@@ -94,6 +97,7 @@ export default function AdminCategories() {
         description: form.description,
         showOnHome: form.showOnHome,
         showInStore: form.showInStore,
+        homeProductLimit: Number.parseInt(form.homeProductLimit, 10) || 4,
         sortOrder: Number.parseInt(form.sortOrder, 10) || 0,
         active: form.active,
       })
@@ -190,9 +194,25 @@ export default function AdminCategories() {
               onChange={(e) => setForm((prev) => ({ ...prev, showOnHome: e.target.checked }))}
             />
             <span>
-              <strong>Show on home page</strong>
+              <strong>Show product row on home page</strong>
             </span>
           </label>
+
+          {form.showOnHome && (
+            <label>
+              Products to show on home
+              <input
+                type="number"
+                min={1}
+                max={24}
+                value={form.homeProductLimit}
+                onChange={(e) => setForm((prev) => ({ ...prev, homeProductLimit: e.target.value }))}
+              />
+              <span className="admin-field-hint">
+                Top products by sort order in this category
+              </span>
+            </label>
+          )}
 
           <label className="admin-toggle">
             <input
@@ -234,7 +254,7 @@ export default function AdminCategories() {
                 <div>
                   <strong>{category.name}</strong>
                   <p className="admin-meta">
-                    {category.id} · home {category.showOnHome ? 'on' : 'off'} · store{' '}
+                    {category.id} · home {category.showOnHome ? `${category.homeProductLimit} products` : 'off'} · store{' '}
                     {category.showInStore ? 'on' : 'off'}
                   </p>
                 </div>

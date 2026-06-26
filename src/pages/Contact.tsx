@@ -31,7 +31,7 @@ export default function Contact() {
 
   return (
     <div className="page page-narrow">
-      <PageHeader title="Contact" subtitle="Questions, custom orders, or just saying hi — we'd love to hear from you." />
+      <PageHeader title="Contact" subtitle="Questions, custom orders, or just saying hi! I'd love to hear from you." />
 
       {success && <p className="form-success">Message sent. We'll get back to you soon.</p>}
 
