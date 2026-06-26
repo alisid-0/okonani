@@ -390,16 +390,8 @@ textarea {
   padding: 0 0 4rem;
 }
 
-.main-home .home-sections {
+.main-home .home-notebook-sheet {
   max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 2rem 1.5rem 0;
-}
-
-.home-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 3rem;
 }
 
 .home-section-title {
@@ -453,6 +445,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  position: relative;
 }
 
 .home-section-header {
@@ -2540,8 +2533,14 @@ textarea {
     max-height: min(70vh, 40rem);
   }
 
-  .main-home .home-sections {
-    padding: 1.5rem 1rem 0;
+  .main-home .home-notebook-sheet,
+  .home-notebook-hero {
+    padding-left: 2.75rem;
+    padding-right: 1rem;
+  }
+
+  .home-notebook {
+    padding-bottom: 2.25rem;
   }
 
   .logo {

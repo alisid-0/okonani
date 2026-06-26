@@ -47,21 +47,28 @@ export default function Home() {
     .filter((row) => row.products.length > 0)
 
   return (
-    <>
+    <div className="home-notebook">
       <section className="hero hero-large">
-        <img
-          className="hero-image"
-          src={img}
-          alt="Welcome to my shop"
-          width={1400}
-          height={788}
-          decoding="async"
-          fetchPriority="high"
-        />
+        <div className="home-notebook-sheet home-notebook-hero">
+          <img
+            className="hero-image"
+            src={img}
+            alt="Welcome to my shop"
+            width={1400}
+            height={788}
+            decoding="async"
+            fetchPriority="high"
+          />
+        </div>
       </section>
 
       {categoryRows.length > 0 && (
-        <div className="home-sections">
+        <>
+          <div className="home-notebook-break" aria-hidden="true">
+            <span className="home-notebook-break-tape home-notebook-break-tape-pink" />
+            <span className="home-notebook-break-tape home-notebook-break-tape-mint" />
+          </div>
+          <div className="home-notebook-sheet">
           {categoryRows.map(({ category, products: rowProducts }) => (
             <section key={category.id} className="home-section">
               <div className="home-section-header home-section-header-row">
@@ -83,7 +90,8 @@ export default function Home() {
             </section>
           ))}
         </div>
+        </>
       )}
-    </>
+    </div>
   )
 }
