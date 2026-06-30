@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import logoMark from '../assets/hero/Untitled_Artwork(3).png'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 
@@ -72,51 +73,18 @@ export default function Header() {
 
   return (
     <header className="header">
-      <div className="header-chrome-row" aria-hidden="true">
-        <div className="window-chrome">
-          <span className="window-btn window-btn-minimize" />
-          <span className="window-btn window-btn-maximize" />
-          <span className="window-btn window-btn-close" />
-        </div>
-      </div>
-
       <div className="header-inner">
-        <div className="header-top-row">
-          <button
-            type="button"
-            className="nav-toggle"
-            aria-expanded={menuOpen}
-            aria-controls="site-nav"
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <MenuIcon open={menuOpen} />
-          </button>
-
-          <NavLink to="/" className="logo" onClick={closeMenu}>
-            okonani
-          </NavLink>
-
-          <div className="header-actions">
-            <NavLink
-              to="/cart"
-              className={iconLinkClass}
-              aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
-              onClick={closeMenu}
-            >
-              <CartIcon />
-              {itemCount > 0 && <span className="icon-badge">{itemCount}</span>}
-            </NavLink>
-            <NavLink
-              to={user ? '/account' : '/login'}
-              className={iconLinkClass}
-              aria-label={user ? 'Your account' : 'Sign in'}
-              onClick={closeMenu}
-            >
-              <LoginIcon />
-            </NavLink>
-          </div>
-        </div>
+        <NavLink to="/" className="logo" onClick={closeMenu}>
+          <img
+            src={logoMark}
+            alt=""
+            className="logo-mark"
+            width={220}
+            height={88}
+            decoding="async"
+          />
+          <span className="logo-text">okonani</span>
+        </NavLink>
 
         <nav
           id="site-nav"
@@ -137,6 +105,39 @@ export default function Header() {
             Contact
           </NavLink>
         </nav>
+
+        <div className="header-end">
+          <div className="header-actions">
+            <NavLink
+              to="/cart"
+              className={iconLinkClass}
+              aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
+              onClick={closeMenu}
+            >
+              <CartIcon />
+              {itemCount > 0 && <span className="icon-badge">{itemCount}</span>}
+            </NavLink>
+            <NavLink
+              to={user ? '/account' : '/login'}
+              className={iconLinkClass}
+              aria-label={user ? 'Your account' : 'Sign in'}
+              onClick={closeMenu}
+            >
+              <LoginIcon />
+            </NavLink>
+          </div>
+
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-expanded={menuOpen}
+            aria-controls="site-nav"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MenuIcon open={menuOpen} />
+          </button>
+        </div>
       </div>
     </header>
   )

@@ -90,7 +90,6 @@ export default function ProductDetail() {
 
           <section className="product-detail-panel">
             {categoryName && <p className="product-detail-category">{categoryName}</p>}
-            <p className="product-detail-eyebrow">Okonani</p>
             <h1>{product.name}</h1>
 
             {product.description && <p className="product-detail-lead">{product.description}</p>}
