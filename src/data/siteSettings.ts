@@ -2,7 +2,7 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { db } from '../lib/firebase'
 
-export type SitePageId = 'home' | 'store' | 'about' | 'socials' | 'contact'
+export type SitePageId = 'home' | 'store' | 'about' | 'contact'
 
 export type SiteSettings = {
   pages: Record<SitePageId, boolean>
@@ -19,7 +19,6 @@ export const SITE_NAV_PAGES: {
   { id: 'home', label: 'Home', to: '/', end: true },
   { id: 'store', label: 'Store', to: '/store' },
   { id: 'about', label: 'About', to: '/about' },
-  { id: 'socials', label: 'Socials', to: '/socials' },
   { id: 'contact', label: 'Contact', to: '/contact' },
 ]
 
@@ -31,7 +30,6 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     home: true,
     store: true,
     about: true,
-    socials: true,
     contact: true,
   },
   siteOffline: false,
@@ -51,7 +49,6 @@ export function parseSiteSettings(data: Record<string, unknown> | undefined): Si
       home: pagesInput.home !== false,
       store: pagesInput.store !== false,
       about: pagesInput.about !== false,
-      socials: pagesInput.socials !== false,
       contact: pagesInput.contact !== false,
     },
     siteOffline: data?.siteOffline === true,

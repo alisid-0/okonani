@@ -12,12 +12,17 @@ import {
 } from '../lib/adminApi'
 import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
+import ImageCropModal from '../components/ImageCropModal'
 import AdminCategories from './AdminCategories'
 import AdminMessages from './AdminMessages'
 import AdminPages from './AdminPages'
 
 type EditorTab = 'details' | 'media'
 type AdminPanel = 'products' | 'categories' | 'messages' | 'pages'
+
+type PendingCrop =
+  | { kind: 'new'; file: File }
+  | { kind: 'replace'; source: string; mediaIndex: number }
 
 type ProductForm = {
   id: string
@@ -67,6 +72,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [cropQueue, setCropQueue] = useState<PendingCrop[]>([])
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -177,26 +183,95 @@ export default function Admin() {
     return nextId
   }
 
-  async function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files
-    if (!files?.length) return
-
+  async function uploadCroppedImage(file: File, mediaIndex?: number) {
     setUploading(true)
     setError(null)
     setMessage(null)
 
     try {
       const productId = ensureProductId()
-      const uploaded = await uploadProductImages(productId, files)
-      setForm((prev) => ({ ...prev, id: productId, media: [...prev.media, ...uploaded] }))
-      setMessage(`Uploaded ${uploaded.length} image${uploaded.length === 1 ? '' : 's'}. Save the product to publish.`)
+      const uploaded = await uploadProductImages(productId, [file])
+      const nextItem = uploaded[0]
+
+      if (!nextItem) {
+        throw new Error('Upload did not return an image URL')
+      }
+
+      setForm((prev) => {
+        if (mediaIndex === undefined) {
+          return { ...prev, id: productId, media: [...prev.media, ...uploaded] }
+        }
+
+        return {
+          ...prev,
+          id: productId,
+          media: prev.media.map((item, index) =>
+            index === mediaIndex ?
+              { ...item, url: nextItem.url, type: 'image', alt: item.alt || nextItem.alt }
+            : item,
+          ),
+        }
+      })
+
+      setMessage(
+        mediaIndex === undefined ?
+          `Uploaded ${uploaded.length} image${uploaded.length === 1 ? '' : 's'}. Save the product to publish.`
+        : 'Image crop updated. Save the product to publish.',
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not upload images')
     } finally {
       setUploading(false)
-      event.target.value = ''
     }
   }
+
+  function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files
+    if (!files?.length) return
+
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'))
+    if (!imageFiles.length) {
+      setError('Choose an image file to upload.')
+      event.target.value = ''
+      return
+    }
+
+    setError(null)
+    setMessage(null)
+    setCropQueue(imageFiles.map((file) => ({ kind: 'new' as const, file })))
+    event.target.value = ''
+  }
+
+  function startCropExisting(mediaIndex: number, url: string) {
+    if (!url.trim()) {
+      setError('Add an image URL before cropping.')
+      return
+    }
+
+    setError(null)
+    setMessage(null)
+    setCropQueue([{ kind: 'replace', source: url.trim(), mediaIndex }])
+  }
+
+  async function handleCropConfirm(file: File) {
+    const current = cropQueue[0]
+    if (!current) return
+
+    setCropQueue((prev) => prev.slice(1))
+
+    if (current.kind === 'new') {
+      await uploadCroppedImage(file)
+      return
+    }
+
+    await uploadCroppedImage(file, current.mediaIndex)
+  }
+
+  function handleCropCancel() {
+    setCropQueue((prev) => prev.slice(1))
+  }
+
+  const activeCrop = cropQueue[0]
 
   async function handleDelete(product: AdminProduct) {
     if (!window.confirm(`Remove "${product.name}" from the store? Stripe IDs will be kept in Firestore.`)) return
@@ -245,6 +320,14 @@ export default function Admin() {
 
   return (
     <div className="admin-shell">
+      {activeCrop && (
+        <ImageCropModal
+          source={activeCrop.kind === 'new' ? activeCrop.file : activeCrop.source}
+          replaceExisting={activeCrop.kind === 'replace'}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+        />
+      )}
       <aside className="admin-sidebar">
         <div className="admin-sidebar-top">
           <p className="admin-brand">Okonani</p>
@@ -476,7 +559,7 @@ export default function Admin() {
               <div className="admin-card-header">
                 <div>
                   <h2>Gallery & media</h2>
-                  <p>Upload images to Firebase Storage, or paste a video URL. The first image is the store thumbnail.</p>
+                  <p>Upload images to Firebase Storage, or paste a video URL. Crop any image before or after upload. The first image is the store thumbnail.</p>
                 </div>
                 <div className="admin-media-header-actions">
                   <label className="admin-upload-label">
@@ -569,6 +652,16 @@ export default function Admin() {
                     </div>
 
                     <div className="admin-media-row-actions">
+                      {item.type === 'image' && item.url.trim() && (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          disabled={uploading || cropQueue.length > 0}
+                          onClick={() => startCropExisting(index, item.url)}
+                        >
+                          Crop
+                        </button>
+                      )}
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => moveMedia(index, -1)}>
                         ↑
                       </button>

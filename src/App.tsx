@@ -11,7 +11,6 @@ const Admin = lazy(() => import('./pages/Admin'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Contact = lazy(() => import('./pages/Contact'))
-const Socials = lazy(() => import('./pages/Socials'))
 const CheckoutCancel = lazy(() => import('./pages/CheckoutCancel'))
 const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'))
 const Login = lazy(() => import('./pages/Login'))
@@ -68,14 +67,6 @@ export default function App() {
             element={
               <RequireVisiblePage pageId="contact">
                 <Contact />
-              </RequireVisiblePage>
-            }
-          />
-          <Route
-            path="socials"
-            element={
-              <RequireVisiblePage pageId="socials">
-                <Socials />
               </RequireVisiblePage>
             }
           />

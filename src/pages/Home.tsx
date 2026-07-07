@@ -23,10 +23,10 @@ export default function Home() {
   return (
     <div className="home-notebook">
       <div className="home-notebook-edges" aria-hidden>
-        <span className="home-notebook-side-deco home-notebook-side-deco-star" />
-        <span className="home-notebook-side-deco home-notebook-side-deco-scribble" />
-        <span className="home-notebook-side-deco home-notebook-side-deco-heart" />
-        <span className="home-notebook-side-deco home-notebook-side-deco-confetti" />
+        <span className="home-notebook-star home-notebook-star-1" />
+        <span className="home-notebook-star home-notebook-star-2" />
+        <span className="home-notebook-star home-notebook-star-3" />
+        <span className="home-notebook-star home-notebook-star-4" />
       </div>
 
       <section className="hero hero-large">
@@ -45,26 +45,26 @@ export default function Home() {
 
       {categoryRows.length > 0 && (
         <div className="home-notebook-sheet">
-            {categoryRows.map(({ category, products: rowProducts }) => (
-              <section key={category.id} className="home-section">
-                <div className="home-section-header home-section-header-row">
-                  <div>
-                    <h2 className="home-section-title">{category.name}</h2>
-                    {category.description && (
-                      <p className="home-section-lead">{category.description}</p>
-                    )}
-                  </div>
-                  <Link to={`/store?category=${category.id}`} className="home-section-link">
-                    View all
-                  </Link>
+          {categoryRows.map(({ category, products: rowProducts }) => (
+            <section key={category.id} className="home-section">
+              <div className="home-section-header home-section-header-row">
+                <div>
+                  <h2 className="home-section-title">{category.name}</h2>
+                  {category.description && (
+                    <p className="home-section-lead">{category.description}</p>
+                  )}
                 </div>
-                <div className="product-grid product-grid-compact home-product-row">
-                  {rowProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} onAdd={() => addItem(product)} />
-                  ))}
-                </div>
-              </section>
-            ))}
+                <Link to={`/store?category=${category.id}`} className="home-section-link">
+                  View all
+                </Link>
+              </div>
+              <div className="product-grid product-grid-compact home-product-row">
+                {rowProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} onAdd={() => addItem(product)} />
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       )}
     </div>

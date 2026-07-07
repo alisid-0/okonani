@@ -25,6 +25,7 @@ export type Product = {
   active?: boolean
   isDeleted?: boolean
   sortOrder?: number
+  createdAt?: string | null
   category?: string
   stripePriceId?: string
   media: ProductMedia[]
@@ -94,6 +95,7 @@ export function parseProduct(id: string, data: Record<string, unknown>): Product
     active: typeof data.active === 'boolean' ? data.active : undefined,
     isDeleted: data.isDeleted === true,
     sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : undefined,
+    createdAt: timestampToIso(data.createdAt),
     category: typeof data.category === 'string' ? data.category : '',
     stripePriceId: typeof data.stripePriceId === 'string' ? data.stripePriceId : undefined,
     media: parseMedia(data.media),
@@ -115,6 +117,12 @@ export function parseReview(id: string, data: Record<string, unknown>): ProductR
   }
 }
 
+function createdAtMs(product: Pick<Product, 'createdAt'>): number {
+  if (!product.createdAt) return Number.MAX_SAFE_INTEGER
+  const parsed = Date.parse(product.createdAt)
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER
+}
+
 function sortProducts(products: Product[]): Product[] {
   return products.sort((a, b) => {
     const sortA = a.sortOrder ?? Number.MAX_SAFE_INTEGER
@@ -122,7 +130,7 @@ function sortProducts(products: Product[]): Product[] {
 
     if (sortA !== sortB) return sortA - sortB
 
-    return a.name.localeCompare(b.name)
+    return createdAtMs(a) - createdAtMs(b)
   })
 }
 

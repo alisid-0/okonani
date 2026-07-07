@@ -83,6 +83,7 @@ export type AdminProduct = {
   priceInCents: number
   active: boolean
   sortOrder: number
+  createdAt: string | null
   category: string
   media: ProductMedia[]
   stripeProductId: string | null
@@ -99,6 +100,17 @@ function timestampToIso(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
+function compareAdminProducts(a: AdminProduct, b: AdminProduct): number {
+  if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+
+  const createdA = a.createdAt ? Date.parse(a.createdAt) : Number.MAX_SAFE_INTEGER
+  const createdB = b.createdAt ? Date.parse(b.createdAt) : Number.MAX_SAFE_INTEGER
+
+  if (createdA !== createdB) return createdA - createdB
+
+  return 0
+}
+
 function parseAdminProduct(id: string, data: Record<string, unknown>): AdminProduct | null {
   const product = parseProduct(id, data)
   if (!product) return null
@@ -111,6 +123,7 @@ function parseAdminProduct(id: string, data: Record<string, unknown>): AdminProd
     priceInCents: product.priceInCents,
     active: product.active !== false,
     sortOrder: product.sortOrder ?? 0,
+    createdAt: product.createdAt ?? null,
     category: product.category ?? '',
     media: product.media,
     stripeProductId: typeof data.stripeProductId === 'string' ? data.stripeProductId : null,
@@ -126,10 +139,7 @@ export async function listAdminProducts(): Promise<{ products: AdminProduct[] }>
     .filter((productDoc) => productDoc.data().isDeleted !== true)
     .map((productDoc) => parseAdminProduct(productDoc.id, productDoc.data()))
     .filter((product): product is AdminProduct => product !== null)
-    .sort((a, b) => {
-      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
-      return a.name.localeCompare(b.name)
-    })
+    .sort(compareAdminProducts)
 
   return { products }
 }
@@ -220,6 +230,20 @@ export async function saveAdminProduct(input: {
   const productId = input.id?.trim() || doc(collection(db, 'products')).id
   const existingSnap = input.id ? await getDoc(doc(db, 'products', input.id)) : null
   const existing = existingSnap?.exists() ? existingSnap.data() : null
+  const isNew = !existingSnap?.exists()
+
+  let sortOrder = input.sortOrder
+  if (isNew && sortOrder === 0) {
+    const allSnap = await getDocs(collection(db, 'products'))
+    const maxSort = allSnap.docs
+      .filter((productDoc) => productDoc.data().isDeleted !== true)
+      .reduce(
+        (max, productDoc) =>
+          Math.max(max, typeof productDoc.data().sortOrder === 'number' ? productDoc.data().sortOrder : 0),
+        0,
+      )
+    sortOrder = maxSort + 1
+  }
 
   const stripeFields = await adminFetch<StripeSyncResult>('/api/admin/products/save', {
     method: 'POST',
@@ -240,7 +264,7 @@ export async function saveAdminProduct(input: {
     longDescription: input.longDescription,
     priceInCents: input.priceInCents,
     active: input.active,
-    sortOrder: input.sortOrder,
+    sortOrder,
     category: input.category.trim(),
     media: input.media.filter((item) => item.url.trim()),
     isDeleted: false,
@@ -248,7 +272,7 @@ export async function saveAdminProduct(input: {
     stripePriceId: stripeFields.stripePriceId ?? existing?.stripePriceId ?? null,
     stripeSyncedAt: stripeFields.stripeSyncedAt,
     updatedAt: serverTimestamp(),
-    ...(existingSnap?.exists() ? {} : { createdAt: serverTimestamp() }),
+    ...(isNew ? { createdAt: serverTimestamp() } : {}),
   }
 
   await setDoc(doc(db, 'products', productId), payload, { merge: true })

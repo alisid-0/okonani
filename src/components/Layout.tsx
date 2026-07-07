@@ -24,9 +24,7 @@ export default function Layout() {
 
     pathname === '/about' ||
 
-    pathname === '/contact' ||
-
-    pathname === '/socials'
+    pathname === '/contact'
 
 
 
