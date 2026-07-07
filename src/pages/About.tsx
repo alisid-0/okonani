@@ -4,7 +4,7 @@ import PageSheet from '../components/PageSheet'
 
 export default function About() {
   return (
-    <div className="page page-about">
+    <div className="page page-about scrapbook-page">
       <PageHeader title="About" subtitle="A little about me and the charms I make." />
 
       <div className="about-layout">

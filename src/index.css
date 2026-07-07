@@ -1767,7 +1767,8 @@ textarea {
 }
 
 .admin-categories,
-.admin-messages {
+.admin-messages,
+.admin-pages {
   padding: 0;
 }
 
@@ -2634,4 +2635,71 @@ textarea {
   .nav-toggle {
     display: none;
   }
+}
+
+/* Site offline */
+
+.site-offline {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.5rem;
+  background: #fff;
+  background-image: var(--notebook-lines, none);
+  background-size: 128px 128px;
+}
+
+.site-offline-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 28rem;
+  text-align: center;
+}
+
+.site-offline-logo {
+  display: block;
+  height: 4.5rem;
+  width: auto;
+  object-fit: contain;
+}
+
+.site-offline-brand {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 2.25rem;
+  font-weight: 400;
+  color: var(--color-pink-deep);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.site-offline-message {
+  margin: 0.75rem 0 0;
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+/* Admin pages panel */
+
+.admin-page-toggle-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-page-toggle {
+  align-items: flex-start;
+}
+
+.admin-page-toggle small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--color-muted);
+  font-weight: 500;
 }

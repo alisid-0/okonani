@@ -77,6 +77,124 @@
   max-width: 38rem;
 }
 
+/* Journal pages — Store, About, Contact (subtle paper, no gimmicks) */
+
+.main-scrapbook {
+  --journal-lines-soft: url("data:image/svg+xml,%3Csvg width='128' height='128' viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cg stroke='%23c2d1e9' stroke-width='1' opacity='0.22'%3E%3Cline x1='0' y1='24' x2='128' y2='24'/%3E%3Cline x1='0' y1='48' x2='128' y2='48'/%3E%3Cline x1='0' y1='72' x2='128' y2='72'/%3E%3Cline x1='0' y1='96' x2='128' y2='96'/%3E%3Cline x1='0' y1='120' x2='128' y2='120'/%3E%3C/g%3E%3C/svg%3E");
+
+  max-width: none;
+  width: 100%;
+  padding: 2rem 1.5rem 4rem;
+  background-color: #fff;
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent 3.35rem,
+      rgba(255, 118, 118, 0.34) 3.35rem,
+      rgba(255, 118, 118, 0.34) calc(3.35rem + 1.5px),
+      transparent calc(3.35rem + 1.5px)
+    ),
+    var(--notebook-lines);
+  background-size: 100% 100%, 128px 128px;
+}
+
+.scrapbook-page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 1rem 0 3.75rem;
+}
+
+.scrapbook-page .page-header {
+  margin-bottom: 2.5rem;
+}
+
+.scrapbook-page .page-header h1 {
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  transform: none;
+}
+
+.scrapbook-page .page-header-lead {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-style: normal;
+  text-align: center;
+}
+
+.scrapbook-page .page-sheet,
+.scrapbook-page .store-body {
+  border: 1px solid rgba(232, 220, 208, 0.7);
+  border-radius: 2px;
+  background-color: #fff;
+  background-image: var(--paper-grain);
+  background-size: 512px 512px;
+  box-shadow: 0 2px 14px rgba(58, 48, 40, 0.05);
+  backdrop-filter: none;
+  transform: none;
+}
+
+.scrapbook-page .page-sheet::before,
+.scrapbook-page .page-sheet::after,
+.scrapbook-page .store-body::before,
+.scrapbook-page .store-body::after {
+  display: none;
+}
+
+.scrapbook-page .page-sheet {
+  padding: 1.75rem 1.5rem 1.5rem;
+}
+
+.scrapbook-page.page-contact .page-sheet {
+  background-image: var(--paper-grain), var(--journal-lines-soft);
+  background-size: 512px 512px, 128px 128px;
+  background-position: 0 0, 0 1.5rem;
+}
+
+.scrapbook-page .store-body {
+  padding: 1.75rem 1.5rem 2rem;
+}
+
+.scrapbook-page .store-filters {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(232, 220, 208, 0.85);
+}
+
+.scrapbook-page .store-filter {
+  transform: none;
+  border-radius: 999px;
+  border: 1px solid rgba(232, 220, 208, 0.9);
+  background: #fff;
+  box-shadow: none;
+}
+
+.scrapbook-page .store-filter:hover {
+  transform: translateY(-1px);
+  border-color: rgba(194, 209, 233, 0.75);
+  background: rgba(194, 209, 233, 0.12);
+}
+
+.scrapbook-page .store-filter.is-active {
+  transform: none;
+  border-color: rgba(238, 155, 188, 0.45);
+  background: rgba(254, 222, 141, 0.32);
+  box-shadow: none;
+}
+
+.scrapbook-page .store-page .product-card {
+  transform: none;
+  border-radius: calc(var(--radius) + 4px);
+}
+
+.scrapbook-page .store-page .product-card:hover {
+  transform: translateY(-4px);
+}
+
 /* About */
 
 .page-about::before {
@@ -92,19 +210,23 @@
 .about-sticker {
   position: relative;
   margin: 0;
-  padding: 0.5rem;
-  transform: rotate(-2.5deg);
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
 }
 
 .about-illustration {
   display: block;
   width: 100%;
   height: auto;
-  filter: drop-shadow(0 14px 32px rgba(238, 155, 188, 0.22));
+  filter: none;
 }
 
 .page-about .about-copy {
-  transform: rotate(0.4deg);
+  background-image: var(--paper-grain), var(--journal-lines-soft);
+  background-size: 512px 512px, 128px 128px;
+  background-position: 0 0, 0 1.25rem;
 }
 
 .page-about .content-block p {
@@ -128,6 +250,133 @@
   color: var(--craft-crayon-mint-deep);
 }
 
+/* Socials */
+
+.page-socials .social-page-layout {
+  display: grid;
+  gap: 2.5rem;
+}
+
+.social-page-status,
+.social-page-updated {
+  margin: 0 0 1.5rem;
+  text-align: center;
+  color: var(--craft-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.social-feed-section {
+  padding: 1.75rem 1.5rem 1.5rem;
+  border: 1px solid rgba(232, 220, 208, 0.7);
+  border-radius: 2px;
+  background-color: #fff;
+  background-image: var(--paper-grain);
+  background-size: 512px 512px;
+  box-shadow: 0 2px 14px rgba(58, 48, 40, 0.05);
+}
+
+.social-feed-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid rgba(232, 220, 208, 0.85);
+}
+
+.social-feed-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--craft-ink);
+}
+
+.social-feed-handle {
+  margin: 0.2rem 0 0;
+  color: var(--craft-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.social-feed-follow {
+  flex-shrink: 0;
+}
+
+.social-post-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 1rem;
+}
+
+.social-post-card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid rgba(232, 220, 208, 0.75);
+  border-radius: 2px;
+  overflow: hidden;
+  background: #fff;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.social-post-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(58, 48, 40, 0.08);
+}
+
+.social-post-media {
+  aspect-ratio: 1 / 1;
+  background: #fff;
+  overflow: hidden;
+}
+
+.social-post-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.social-post-image-placeholder {
+  background: linear-gradient(180deg, rgba(194, 209, 233, 0.2), rgba(238, 155, 188, 0.16));
+}
+
+.social-post-body {
+  padding: 0.65rem 0.7rem 0.75rem;
+}
+
+.social-post-caption {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--craft-ink);
+}
+
+.social-post-date {
+  margin: 0.35rem 0 0;
+  font-size: var(--text-xs);
+  color: var(--craft-ink-soft);
+}
+
+.social-feed-empty {
+  margin: 0;
+  color: var(--craft-ink-soft);
+  line-height: 1.55;
+}
+
+.social-feed-empty a {
+  color: var(--craft-crayon-pink-hot);
+}
+
+@media (min-width: 900px) {
+  .page-socials .social-page-layout {
+    grid-template-columns: 1fr 1fr;
+    gap: 1.75rem;
+    align-items: start;
+  }
+}
+
 /* Store */
 
 .store-body {
@@ -146,7 +395,6 @@
 }
 
 .store-filter {
-  transform: rotate(var(--filter-tilt, 0deg));
   transition:
     transform 0.2s ease,
     background 0.15s ease,
@@ -154,17 +402,9 @@
     box-shadow 0.15s ease;
 }
 
-.store-filter:nth-child(odd) {
-  --filter-tilt: -1deg;
-}
-
-.store-filter:nth-child(even) {
-  --filter-tilt: 0.85deg;
-}
-
 .store-filter:hover,
 .store-filter.is-active {
-  transform: translateY(-2px) rotate(0deg);
+  transform: translateY(-2px);
 }
 
 .store-page .product-grid {
@@ -194,82 +434,30 @@
   border: none;
   border-radius: 1px;
   background: #fafaf8;
-  overflow: visible;
+  overflow: hidden;
   padding: 0.7rem 0.7rem 0;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
     0 3px 10px rgba(58, 48, 40, 0.09);
-  transform: rotate(var(--card-tilt, 0deg));
+  transform: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .home-product-row .product-card::before,
 .home-product-row .product-card::after {
-  content: '';
-  position: absolute;
-  z-index: 3;
-  height: 1.4rem;
-  pointer-events: none;
-  border-radius: 1px;
-  background:
-    repeating-linear-gradient(
-      93deg,
-      rgba(255, 255, 255, 0.14) 0 1px,
-      rgba(0, 0, 0, 0.03) 1px 2px,
-      transparent 2px 5px
-    ),
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.42) 0%,
-      var(--tape-fill) 22%,
-      color-mix(in srgb, var(--tape-fill) 88%, rgba(58, 48, 40, 0.12)) 100%
-    );
-  box-shadow:
-    0 1px 2px rgba(58, 48, 40, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(58, 48, 40, 0.05);
-  opacity: 0.94;
-  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  display: none;
 }
 
-.home-product-row .product-card::before {
-  top: -0.55rem;
-  left: 6%;
-  width: 44%;
-  --tape-fill: rgba(254, 222, 141, 0.62);
-  transform: rotate(var(--tape-left, -24deg));
-}
-
-.home-product-row .product-card::after {
-  top: -0.5rem;
-  right: 5%;
-  width: 40%;
-  --tape-fill: rgba(238, 155, 188, 0.48);
-  transform: rotate(var(--tape-right, 17deg));
-}
-
-.home-product-row .product-card > * {
-  position: relative;
-  z-index: 1;
-}
-
-.home-product-row .product-card:nth-child(odd) {
-  --card-tilt: -0.75deg;
-  --tape-left: -27deg;
-  --tape-right: 19deg;
-}
-
+.home-product-row .product-card:nth-child(odd),
 .home-product-row .product-card:nth-child(even) {
-  --card-tilt: 0.6deg;
-  --tape-left: -19deg;
-  --tape-right: 13deg;
+  --card-tilt: 0deg;
 }
 
 .home-product-row .product-card:hover {
-  transform: translateY(-2px) rotate(0deg);
+  transform: translateY(-2px);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 6px 16px rgba(58, 48, 40, 0.11);
+    0 6px 16px rgba(58, 48, 40, 0.1);
 }
 
 .home-product-row .product-card-media {
@@ -588,6 +776,14 @@
 }
 
 @media (max-width: 768px) {
+  .main-scrapbook {
+    padding: 1.5rem 1rem 3.5rem;
+  }
+
+  .scrapbook-page {
+    padding-left: 1.35rem;
+  }
+
   .about-layout {
     grid-template-columns: 1fr;
     gap: 1.75rem;
@@ -596,7 +792,7 @@
   }
 
   .about-sticker {
-    transform: rotate(-1.5deg);
+    transform: none;
   }
 
   .page-about .about-copy {

@@ -14,6 +14,12 @@ import {
   parseProduct,
   type ProductMedia,
 } from '../data/products'
+import {
+  DEFAULT_SITE_SETTINGS,
+  parseSiteSettings,
+  SITE_SETTINGS_DOC,
+  type SiteSettings,
+} from '../data/siteSettings'
 import type { StoreCategory } from '../data/categories'
 import { auth, db } from './firebase'
 
@@ -334,4 +340,27 @@ export async function markContactMessageRead(id: string): Promise<void> {
 export async function deleteAdminContactMessage(id: string): Promise<void> {
   await ensureAdminFirestoreAccess()
   await deleteDoc(doc(db, 'contactMessages', id))
+}
+
+export async function getSiteSettings(): Promise<SiteSettings> {
+  await ensureAdminFirestoreAccess()
+  const snapshot = await getDoc(doc(db, SITE_SETTINGS_DOC))
+  return parseSiteSettings(snapshot.data())
+}
+
+export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
+  await ensureAdminFirestoreAccess()
+
+  const offlineMessage = settings.offlineMessage.trim() || DEFAULT_SITE_SETTINGS.offlineMessage
+
+  await setDoc(
+    doc(db, SITE_SETTINGS_DOC),
+    {
+      pages: settings.pages,
+      siteOffline: settings.siteOffline,
+      offlineMessage,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
 }

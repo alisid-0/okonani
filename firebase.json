@@ -60,6 +60,13 @@
         }
       },
       {
+        "source": "/api/social/feeds",
+        "function": {
+          "functionId": "getSocialFeeds",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

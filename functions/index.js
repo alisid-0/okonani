@@ -26,6 +26,7 @@ const {
   redeemPointsForCoupon,
   pointsForAmountCents,
 } = require('./points')
+const { getSocialFeeds } = require('./socialFeeds')
 
 if (!getApps().length) {
   initializeApp({
@@ -572,6 +573,26 @@ exports.getRewardsSummary = onRequest({ region, cors: true, invoker: 'public' },
         pointsSpent: reward.pointsSpent,
       })),
     })
+  } catch (err) {
+    sendHttpError(res, err)
+  }
+})
+
+exports.getSocialFeeds = onRequest({ ...httpOptions }, async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('')
+    return
+  }
+
+  if (req.method !== 'GET') {
+    sendMethodNotAllowed(res, 'GET')
+    return
+  }
+
+  try {
+    const force = req.query.refresh === '1'
+    const feeds = await getSocialFeeds({ force })
+    res.json(feeds)
   } catch (err) {
     sendHttpError(res, err)
   }

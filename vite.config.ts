@@ -64,6 +64,11 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               rewrite: () => '/getRewardsSummary',
             },
+            '/api/social/feeds': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/getSocialFeeds',
+            },
           },
         }
       : undefined,

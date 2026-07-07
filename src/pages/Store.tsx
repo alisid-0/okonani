@@ -33,7 +33,7 @@ export default function Store() {
   }
 
   return (
-    <div className="page store-page">
+    <div className="page store-page scrapbook-page">
       <PageHeader
         title={activeCategoryMeta?.name ?? 'Store'}
         subtitle={

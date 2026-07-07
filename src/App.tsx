@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import AdminRoute from './components/AdminRoute'
 import Layout from './components/Layout'
+import RequireVisiblePage from './components/RequireVisiblePage'
 import Home from './pages/Home'
 
 const About = lazy(() => import('./pages/About'))
@@ -10,6 +11,7 @@ const Admin = lazy(() => import('./pages/Admin'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const Cart = lazy(() => import('./pages/Cart'))
 const Contact = lazy(() => import('./pages/Contact'))
+const Socials = lazy(() => import('./pages/Socials'))
 const CheckoutCancel = lazy(() => import('./pages/CheckoutCancel'))
 const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'))
 const Login = lazy(() => import('./pages/Login'))
@@ -29,11 +31,54 @@ export default function App() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="store" element={<Store />} />
-          <Route path="store/:productId" element={<ProductDetail />} />
-          <Route path="about" element={<About />} />
-          <Route path="contact" element={<Contact />} />
+          <Route
+            index
+            element={
+              <RequireVisiblePage pageId="home">
+                <Home />
+              </RequireVisiblePage>
+            }
+          />
+          <Route
+            path="store"
+            element={
+              <RequireVisiblePage pageId="store">
+                <Store />
+              </RequireVisiblePage>
+            }
+          />
+          <Route
+            path="store/:productId"
+            element={
+              <RequireVisiblePage pageId="store">
+                <ProductDetail />
+              </RequireVisiblePage>
+            }
+          />
+          <Route
+            path="about"
+            element={
+              <RequireVisiblePage pageId="about">
+                <About />
+              </RequireVisiblePage>
+            }
+          />
+          <Route
+            path="contact"
+            element={
+              <RequireVisiblePage pageId="contact">
+                <Contact />
+              </RequireVisiblePage>
+            }
+          />
+          <Route
+            path="socials"
+            element={
+              <RequireVisiblePage pageId="socials">
+                <Socials />
+              </RequireVisiblePage>
+            }
+          />
           <Route path="cart" element={<Cart />} />
           <Route path="login" element={<Login />} />
           <Route path="account" element={<Account />} />

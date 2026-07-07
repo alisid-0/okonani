@@ -93,6 +93,10 @@ body {
   background: transparent;
 }
 
+.main-scrapbook {
+  background-color: #fff;
+}
+
 .home-notebook-edges {
   position: absolute;
   inset: 0;
@@ -210,11 +214,11 @@ body {
 }
 
 .home-notebook .home-product-row .product-card:hover {
-  transform: translateY(-2px) rotate(0deg);
+  transform: translateY(-2px);
   border-color: transparent;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 6px 16px rgba(58, 48, 40, 0.11);
+    0 6px 16px rgba(58, 48, 40, 0.1);
 }
 
 .home-notebook .hero-large {

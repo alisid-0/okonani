@@ -14,9 +14,10 @@ import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
 import AdminCategories from './AdminCategories'
 import AdminMessages from './AdminMessages'
+import AdminPages from './AdminPages'
 
 type EditorTab = 'details' | 'media'
-type AdminPanel = 'products' | 'categories' | 'messages'
+type AdminPanel = 'products' | 'categories' | 'messages' | 'pages'
 
 type ProductForm = {
   id: string
@@ -272,6 +273,13 @@ export default function Admin() {
           >
             Messages
           </button>
+          <button
+            type="button"
+            className={`admin-sidebar-nav-btn ${panel === 'pages' ? 'is-active' : ''}`}
+            onClick={() => setPanel('pages')}
+          >
+            Pages
+          </button>
         </div>
 
         {panel !== 'products' && <div className="admin-sidebar-fill" aria-hidden="true" />}
@@ -332,6 +340,8 @@ export default function Admin() {
           <AdminCategories />
         : panel === 'messages' ?
           <AdminMessages />
+        : panel === 'pages' ?
+          <AdminPages />
         : <>
         <header className="admin-main-header">
           <div>
