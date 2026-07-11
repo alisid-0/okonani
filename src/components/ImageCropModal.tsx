@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
-import { cropImageSource, DEFAULT_CROP_STATE, type CropState } from '../lib/cropImage'
+import { useCallback, useEffect, useState } from 'react'
+import Cropper, { type Area, type Point } from 'react-easy-crop'
+import 'react-easy-crop/react-easy-crop.css'
+import { exportCroppedImageFile } from '../lib/cropImage'
+import { fetchAdminMediaBlobUrl, isFirebaseStorageUrl } from '../lib/storageUpload'
 
 type ImageCropModalProps = {
   source: File | string
@@ -14,33 +17,87 @@ export default function ImageCropModal({
   onCancel,
   onConfirm,
 }: ImageCropModalProps) {
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [crop, setCrop] = useState<CropState>(DEFAULT_CROP_STATE)
+  const [imageUrl, setImageUrl] = useState('')
+  const [loadingImage, setLoadingImage] = useState(true)
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setCrop(DEFAULT_CROP_STATE)
+    let objectUrl = ''
+    let cancelled = false
 
-    if (typeof source === 'string') {
-      setPreviewUrl(source)
-      return
+    async function loadImageSource() {
+      setLoadingImage(true)
+      setError(null)
+      setCrop({ x: 0, y: 0 })
+      setZoom(1)
+      setCroppedAreaPixels(null)
+      setImageUrl('')
+
+      try {
+        if (typeof source === 'string') {
+          if (isFirebaseStorageUrl(source)) {
+            objectUrl = await fetchAdminMediaBlobUrl(source)
+          } else {
+            objectUrl = source
+          }
+        } else {
+          objectUrl = URL.createObjectURL(source)
+        }
+
+        if (!cancelled) {
+          setImageUrl(objectUrl)
+        } else if (objectUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(objectUrl)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load image')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingImage(false)
+        }
+      }
     }
 
-    const url = URL.createObjectURL(source)
-    setPreviewUrl(url)
+    loadImageSource()
 
     return () => {
-      URL.revokeObjectURL(url)
+      cancelled = true
+      if (objectUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(objectUrl)
+      }
     }
   }, [source])
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
+  const onCropComplete = useCallback((_area: Area, pixels: Area) => {
+    setCroppedAreaPixels(pixels)
+  }, [])
+
   async function handleConfirm() {
+    if (!imageUrl || !croppedAreaPixels) {
+      setError('Adjust the crop area before saving.')
+      return
+    }
+
     setProcessing(true)
     setError(null)
 
     try {
-      const cropped = await cropImageSource(source, crop)
+      const cropped = await exportCroppedImageFile(imageUrl, croppedAreaPixels, source)
       onConfirm(cropped)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not crop image')
@@ -50,64 +107,54 @@ export default function ImageCropModal({
   }
 
   return (
-    <div className="image-crop-backdrop" role="presentation" onClick={onCancel}>
+    <div className="image-crop-backdrop" role="presentation">
       <div
         className="image-crop-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="image-crop-title"
-        onClick={(event) => event.stopPropagation()}
       >
         <header className="image-crop-header">
-          <h2 id="image-crop-title">{replaceExisting ? 'Edit image crop' : 'Crop image'}</h2>
-          <p>Drag the preview to center your product, then save a square image.</p>
+          <h2 id="image-crop-title">{replaceExisting ? 'Re-crop store image' : 'Crop image'}</h2>
+          <p>
+            {replaceExisting ?
+              'This updates the image shoppers see. The original file is kept so you can crop again later.'
+            : 'Drag to reposition. Use the slider or scroll wheel to zoom. The square frame is what shoppers will see.'}
+          </p>
         </header>
 
-        <div
-          className="image-crop-stage"
-          style={{
-            backgroundImage: previewUrl ? `url(${previewUrl})` : undefined,
-            backgroundSize: `${crop.zoom * 100}%`,
-            backgroundPosition: `calc(50% + ${crop.offsetX * 28}%) calc(50% + ${crop.offsetY * 28}%)`,
-          }}
-          onPointerDown={(event) => {
-            const stage = event.currentTarget
-            const startX = event.clientX
-            const startY = event.clientY
-            const startCrop = { ...crop }
-
-            function onMove(moveEvent: PointerEvent) {
-              const dx = (moveEvent.clientX - startX) / stage.clientWidth
-              const dy = (moveEvent.clientY - startY) / stage.clientHeight
-
-              setCrop({
-                ...startCrop,
-                offsetX: Math.max(-1, Math.min(1, startCrop.offsetX + dx * 2)),
-                offsetY: Math.max(-1, Math.min(1, startCrop.offsetY + dy * 2)),
-              })
-            }
-
-            function onUp() {
-              window.removeEventListener('pointermove', onMove)
-              window.removeEventListener('pointerup', onUp)
-            }
-
-            window.addEventListener('pointermove', onMove)
-            window.addEventListener('pointerup', onUp)
-          }}
-        />
+        <div className="image-crop-stage">
+          {loadingImage ?
+            <p className="image-crop-loading">Loading image…</p>
+          : imageUrl ?
+            <Cropper
+              image={imageUrl}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="rect"
+              showGrid
+              zoomWithScroll
+              restrictPosition={false}
+              minZoom={1}
+              maxZoom={4}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+            />
+          : null}
+        </div>
 
         <label className="image-crop-zoom">
           Zoom
           <input
             type="range"
             min={1}
-            max={2.5}
-            step={0.01}
-            value={crop.zoom}
-            onChange={(event) =>
-              setCrop((prev) => ({ ...prev, zoom: Number.parseFloat(event.target.value) }))
-            }
+            max={4}
+            step={0.05}
+            value={zoom}
+            disabled={loadingImage || !imageUrl}
+            onChange={(event) => setZoom(Number.parseFloat(event.target.value))}
           />
         </label>
 
@@ -117,8 +164,13 @@ export default function ImageCropModal({
           <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={processing}>
             Cancel
           </button>
-          <button type="button" className="btn btn-primary" onClick={handleConfirm} disabled={processing}>
-            {processing ? 'Saving crop…' : replaceExisting ? 'Save cropped image' : 'Use cropped image'}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleConfirm}
+            disabled={processing || loadingImage || !imageUrl}
+          >
+            {processing ? 'Saving crop…' : replaceExisting ? 'Update store image' : 'Use cropped image'}
           </button>
         </footer>
       </div>

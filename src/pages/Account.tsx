@@ -56,7 +56,7 @@ export default function Account() {
 
   if (authLoading) {
     return (
-      <div className="page page-narrow">
+      <div className="page page-narrow page-account notebook-page">
         <p>Loading…</p>
       </div>
     )
@@ -105,7 +105,7 @@ export default function Account() {
   }
 
   return (
-    <div className="page page-narrow">
+    <div className="page page-narrow page-account notebook-page">
       <PageHeader title="Your account" subtitle={user.email ?? ''} />
 
       <PageSheet className="page-stack">

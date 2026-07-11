@@ -6,6 +6,8 @@ export type ProductMedia = {
   url: string
   type: 'image' | 'video'
   alt?: string
+  /** Admin-only: uncropped original kept for re-cropping; not shown on the storefront */
+  sourceUrl?: string
 }
 
 export type ProductReview = {
@@ -55,19 +57,27 @@ function parseMedia(data: unknown): ProductMedia[] {
   const media: ProductMedia[] = []
 
   for (const item of data) {
+    if (typeof item === 'string') {
+      const url = item.trim()
+      if (url) media.push({ url, type: 'image' })
+      continue
+    }
+
     if (!item || typeof item !== 'object') continue
 
     const record = item as Record<string, unknown>
     const url = typeof record.url === 'string' ? record.url.trim() : ''
-    const type = record.type === 'video' ? 'video' : record.type === 'image' ? 'image' : null
+    const type = record.type === 'video' ? 'video' : record.type === 'image' ? 'image' : url ? 'image' : null
 
     if (!url || !type) continue
 
-    media.push({
-      url,
-      type,
-      alt: typeof record.alt === 'string' ? record.alt : undefined,
-    })
+    const parsed: ProductMedia = { url, type }
+    if (typeof record.alt === 'string' && record.alt.trim()) parsed.alt = record.alt.trim()
+    if (typeof record.sourceUrl === 'string' && record.sourceUrl.trim()) {
+      parsed.sourceUrl = record.sourceUrl.trim()
+    }
+
+    media.push(parsed)
   }
 
   return media
@@ -130,7 +140,12 @@ function sortProducts(products: Product[]): Product[] {
 
     if (sortA !== sortB) return sortA - sortB
 
-    return createdAtMs(a) - createdAtMs(b)
+    const createdA = createdAtMs(a)
+    const createdB = createdAtMs(b)
+
+    if (createdA !== createdB) return createdA - createdB
+
+    return a.id.localeCompare(b.id)
   })
 }
 

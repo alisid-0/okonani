@@ -56,37 +56,21 @@
   max-width: 38rem;
 }
 
-/* Journal pages — Store, About, Contact (subtle paper, no gimmicks) */
+/* Notebook inner pages — Store, About, Contact, etc. */
 
-.main-scrapbook {
-  --journal-lines-soft: url("data:image/svg+xml,%3Csvg width='128' height='128' viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cg stroke='%23c2d1e9' stroke-width='1' opacity='0.22'%3E%3Cline x1='0' y1='24' x2='128' y2='24'/%3E%3Cline x1='0' y1='48' x2='128' y2='48'/%3E%3Cline x1='0' y1='72' x2='128' y2='72'/%3E%3Cline x1='0' y1='96' x2='128' y2='96'/%3E%3Cline x1='0' y1='120' x2='128' y2='120'/%3E%3C/g%3E%3C/svg%3E");
-
-  max-width: none;
-  width: 100%;
-  padding: 2rem 1.5rem 4rem;
-  background-color: #fff;
-  background-image:
-    linear-gradient(
-      90deg,
-      transparent 3.35rem,
-      rgba(255, 118, 118, 0.34) 3.35rem,
-      rgba(255, 118, 118, 0.34) calc(3.35rem + 1.5px),
-      transparent calc(3.35rem + 1.5px)
-    ),
-    var(--notebook-lines);
-  background-size: 100% 100%, 128px 128px;
-}
-
+.notebook-page,
 .scrapbook-page {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 1rem 0 3.75rem;
 }
 
+.notebook-page .page-header,
 .scrapbook-page .page-header {
   margin-bottom: 2.5rem;
 }
 
+.notebook-page .page-header h1,
 .scrapbook-page .page-header h1 {
   display: block;
   padding: 0;
@@ -96,6 +80,7 @@
   transform: none;
 }
 
+.notebook-page .page-header-lead,
 .scrapbook-page .page-header-lead {
   margin-top: 0.5rem;
   padding: 0;
@@ -105,6 +90,14 @@
   text-align: center;
 }
 
+.notebook-page .page-sheet,
+.notebook-page .store-body,
+.notebook-page .product-detail-shell,
+.notebook-page .about-copy,
+.notebook-page .cart-summary,
+.notebook-page .cart-list,
+.notebook-page .cart-empty,
+.notebook-page .account-card,
 .scrapbook-page .page-sheet,
 .scrapbook-page .store-body {
   border: none;
@@ -116,12 +109,10 @@
   transform: none;
 }
 
-.scrapbook-page.page-contact .page-sheet {
-  background-image: none;
-  background-size: auto;
-  background-position: 0 0;
-}
-
+.notebook-page .page-sheet::before,
+.notebook-page .page-sheet::after,
+.notebook-page .store-body::before,
+.notebook-page .store-body::after,
 .scrapbook-page .page-sheet::before,
 .scrapbook-page .page-sheet::after,
 .scrapbook-page .store-body::before,
@@ -129,24 +120,29 @@
   display: none;
 }
 
-.scrapbook-page .page-sheet {
-  padding: 1.75rem 1.5rem 1.5rem;
-}
-
+.notebook-page .page-sheet,
+.notebook-page.page-contact .page-sheet,
+.scrapbook-page .page-sheet,
 .scrapbook-page.page-contact .page-sheet {
   padding: 1.75rem 1.5rem 1.5rem;
+  background-image: none;
+  background-size: auto;
+  background-position: 0 0;
 }
 
+.notebook-page .store-body,
 .scrapbook-page .store-body {
   padding: 1.75rem 1.5rem 2rem;
 }
 
+.notebook-page .store-filters,
 .scrapbook-page .store-filters {
   margin-bottom: 1.75rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid rgba(232, 220, 208, 0.85);
 }
 
+.notebook-page .store-filter,
 .scrapbook-page .store-filter {
   transform: none;
   border-radius: 999px;
@@ -155,12 +151,14 @@
   box-shadow: none;
 }
 
+.notebook-page .store-filter:hover,
 .scrapbook-page .store-filter:hover {
   transform: translateY(-1px);
   border-color: rgba(238, 155, 188, 0.55);
   background: rgba(238, 155, 188, 0.12);
 }
 
+.notebook-page .store-filter.is-active,
 .scrapbook-page .store-filter.is-active {
   transform: none;
   border-color: rgba(238, 155, 188, 0.45);
@@ -168,13 +166,40 @@
   box-shadow: none;
 }
 
+.notebook-page .store-page .product-card,
 .scrapbook-page .store-page .product-card {
   transform: none;
   border-radius: calc(var(--radius) + 4px);
 }
 
+.notebook-page .store-page .product-card:hover,
 .scrapbook-page .store-page .product-card:hover {
   transform: translateY(-4px);
+}
+
+.notebook-page .product-detail-gallery-wrap {
+  background: rgba(255, 255, 255, 0.55);
+  border: var(--soft-border);
+  box-shadow: none;
+}
+
+.notebook-page .product-detail-shell {
+  padding: 0;
+}
+
+.notebook-page .cart-summary,
+.notebook-page .cart-list,
+.notebook-page .cart-empty {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.notebook-page .rewards-prompt,
+.notebook-page .rewards-checkout-gate-panel {
+  border: var(--soft-border);
+  border-radius: calc(var(--radius) + 6px);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
 }
 
 /* About */
@@ -206,30 +231,35 @@
 }
 
 .page-about .about-copy {
-  background-image: var(--paper-grain), var(--journal-lines-soft);
-  background-size: 512px 512px, 128px 128px;
-  background-position: 0 0, 0 1.25rem;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.page-about .about-card {
+  padding: 1.75rem 1.5rem;
+  border: var(--soft-border);
+  border-radius: calc(var(--radius) + 6px);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.page-account .account-card {
+  padding: 1.75rem 1.5rem;
+  border: var(--soft-border);
+  border-radius: calc(var(--radius) + 6px);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .page-about .content-block p {
+  margin: 0 0 1rem;
   font-size: var(--text-lg);
-  line-height: 1.72;
-  color: var(--craft-ink-soft);
-}
-
-.page-about .content-block p:first-child::first-letter {
-  float: left;
-  margin: 0.06em 0.14em 0 0;
-  font-size: 2.65em;
-  line-height: 0.82;
-  color: var(--craft-crayon-pink-hot);
+  line-height: 1.7;
+  color: var(--color-text);
 }
 
 .page-about .content-block p:last-child {
   margin-bottom: 0;
-  padding-top: 0.5rem;
-  font-style: italic;
-  color: var(--craft-crayon-mint-deep);
 }
 
 /* Socials */
@@ -670,6 +700,33 @@
 
 /* Forms & account */
 
+.page-contact .page-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-contact .contact-form,
+.page-contact .form-success,
+.page-contact .form-error {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.page-login .page-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-login .auth-tabs,
+.page-login .auth-form,
+.page-login .auth-footer,
+.page-login .form-error {
+  width: 100%;
+  max-width: 28rem;
+}
+
 .contact-form,
 .auth-form {
   display: flex;
@@ -758,35 +815,57 @@
 }
 
 @media (max-width: 768px) {
+  .main-notebook,
   .main-scrapbook {
-    padding: 1.5rem 1rem 3.5rem;
+    padding: 1.25rem 0.75rem 3rem;
   }
 
+  .notebook-page,
   .scrapbook-page {
-    padding-left: 1.35rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .notebook-page .store-body,
+  .scrapbook-page .store-body {
+    padding: 1rem 0.5rem 1.5rem;
+  }
+
+  .notebook-page .page-sheet,
+  .notebook-page.page-contact .page-sheet,
+  .scrapbook-page .page-sheet,
+  .scrapbook-page.page-contact .page-sheet {
+    padding: 1.25rem 1rem 1.15rem;
+  }
+
+  .page-about .about-card,
+  .page-account .account-card {
+    padding: 1.25rem 1rem;
   }
 
   .about-layout {
     grid-template-columns: 1fr;
     gap: 1.75rem;
-    max-width: 24rem;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
   }
 
   .about-sticker {
     transform: none;
   }
 
-  .page-about .about-copy {
-    transform: none;
+  .store-body {
+    padding: 1rem 0.5rem 1.25rem;
   }
 
-  .store-body {
-    padding: 1.15rem;
+  .store-filters {
+    gap: 0.5rem;
   }
 
   .store-filter {
     transform: none;
+    font-size: var(--text-sm);
+    padding: 0.5rem 0.85rem;
   }
 
   .home-product-row .product-card {

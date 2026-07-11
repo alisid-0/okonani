@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import PageSheet from '../components/PageSheet'
-import { GuestCheckoutGate } from '../components/RewardsPrompt'
+import { GuestCheckoutGate, GuestRewardsPrompt } from '../components/RewardsPrompt'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { formatPrice, getProductCover } from '../data/products'
@@ -87,7 +87,7 @@ export default function Cart() {
 
   if (lines.length === 0) {
     return (
-      <div className="page cart-page">
+      <div className="page cart-page notebook-page">
         <PageHeader title="Shopping cart" subtitle="Your cart is empty." />
 
         <PageSheet>
@@ -107,11 +107,13 @@ export default function Cart() {
   const itemCount = lines.reduce((total, line) => total + line.quantity, 0)
 
   return (
-    <div className="page cart-page">
+    <div className="page cart-page notebook-page">
       <PageHeader
         title="Shopping cart"
         subtitle={`${itemCount} item${itemCount === 1 ? '' : 's'} · ${formatPrice(subtotalCents)}`}
       />
+
+      {!user && <GuestRewardsPrompt returnTo="/cart" />}
 
       <div className="cart-layout">
         <section className="cart-items-panel" aria-label="Cart items">
@@ -182,15 +184,6 @@ export default function Cart() {
         </section>
 
         <aside className="cart-summary" aria-label="Order summary">
-          {!user && (
-            <div className="cart-signin-banner">
-              <p>Sign in to earn rewards on this order.</p>
-              <Link to="/login" state={{ from: '/cart' }} className="btn btn-outline btn-sm">
-                Sign in
-              </Link>
-            </div>
-          )}
-
           <div className="cart-summary-section">
             <div className="cart-summary-row">
               <span>Subtotal</span>

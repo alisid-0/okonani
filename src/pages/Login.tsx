@@ -18,9 +18,9 @@ export default function Login() {
 
   if (authLoading) {
     return (
-      <div className="page page-narrow">
-        <p>Loading…</p>
-      </div>
+    <div className="page page-narrow page-login notebook-page">
+      <p>Loading…</p>
+    </div>
     )
   }
 
@@ -51,7 +51,7 @@ export default function Login() {
   }
 
   return (
-    <div className="page page-narrow">
+    <div className="page page-narrow page-login notebook-page">
       <PageHeader
         title={mode === 'signin' ? 'Sign in' : 'Create account'}
         subtitle="Save your reviews and get notified about new products."

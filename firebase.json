@@ -60,6 +60,13 @@
         }
       },
       {
+        "source": "/api/admin/media/read",
+        "function": {
+          "functionId": "adminReadMedia",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "/api/social/feeds",
         "function": {
           "functionId": "getSocialFeeds",

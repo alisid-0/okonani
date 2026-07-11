@@ -25,6 +25,22 @@ import { auth, db } from './firebase'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
 
+function serializeMedia(media: ProductMedia[]): ProductMedia[] {
+  return media
+    .filter((item) => item.url.trim())
+    .map((item) => {
+      const next: ProductMedia = {
+        url: item.url.trim(),
+        type: item.type === 'video' ? 'video' : 'image',
+      }
+
+      if (item.alt?.trim()) next.alt = item.alt.trim()
+      if (item.sourceUrl?.trim()) next.sourceUrl = item.sourceUrl.trim()
+
+      return next
+    })
+}
+
 async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const user = auth.currentUser
   if (!user) {
@@ -170,8 +186,36 @@ export async function listAdminCategories(): Promise<StoreCategory[]> {
         active: data.active !== false,
       } satisfies StoreCategory
     })
-    .filter((category): category is StoreCategory => category !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    .filter((category): category is StoreCategory => category !== null && category.active)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
+}
+
+export async function updateProductSortOrders(orderedIds: string[]): Promise<void> {
+  await ensureAdminFirestoreAccess()
+
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      setDoc(
+        doc(db, 'products', id),
+        { sortOrder: index + 1, updatedAt: serverTimestamp() },
+        { merge: true },
+      ),
+    ),
+  )
+}
+
+export async function updateCategorySortOrders(orderedIds: string[]): Promise<void> {
+  await ensureAdminFirestoreAccess()
+
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      setDoc(
+        doc(db, 'categories', id),
+        { sortOrder: index + 1, updatedAt: serverTimestamp() },
+        { merge: true },
+      ),
+    ),
+  )
 }
 
 export async function saveAdminCategory(input: {
@@ -189,6 +233,19 @@ export async function saveAdminCategory(input: {
   const categoryId = input.id.trim()
   if (!categoryId) throw new Error('Category id is required')
 
+  const existingSnap = await getDoc(doc(db, 'categories', categoryId))
+  let sortOrder = input.sortOrder
+
+  if (!existingSnap.exists()) {
+    const allSnap = await getDocs(collection(db, 'categories'))
+    const maxSort = allSnap.docs.reduce(
+      (max, docSnap) =>
+        Math.max(max, typeof docSnap.data().sortOrder === 'number' ? docSnap.data().sortOrder : 0),
+      0,
+    )
+    sortOrder = maxSort + 1
+  }
+
   await setDoc(
     doc(db, 'categories', categoryId),
     {
@@ -197,7 +254,7 @@ export async function saveAdminCategory(input: {
       showOnHome: input.showOnHome,
       showInStore: input.showInStore,
       homeProductLimit: Math.min(24, Math.max(1, Math.round(input.homeProductLimit))),
-      sortOrder: input.sortOrder,
+      sortOrder,
       active: input.active,
       updatedAt: serverTimestamp(),
     },
@@ -207,10 +264,24 @@ export async function saveAdminCategory(input: {
 
 export async function deleteAdminCategory(categoryId: string): Promise<void> {
   await ensureAdminFirestoreAccess()
+
   await setDoc(
     doc(db, 'categories', categoryId),
     { active: false, updatedAt: serverTimestamp() },
     { merge: true },
+  )
+
+  const productsSnap = await getDocs(collection(db, 'products'))
+  await Promise.all(
+    productsSnap.docs
+      .filter((productDoc) => productDoc.data().category === categoryId)
+      .map((productDoc) =>
+        setDoc(
+          doc(db, 'products', productDoc.id),
+          { category: '', updatedAt: serverTimestamp() },
+          { merge: true },
+        ),
+      ),
   )
 }
 
@@ -233,16 +304,17 @@ export async function saveAdminProduct(input: {
   const isNew = !existingSnap?.exists()
 
   let sortOrder = input.sortOrder
-  if (isNew && sortOrder === 0) {
+  if (isNew) {
     const allSnap = await getDocs(collection(db, 'products'))
-    const maxSort = allSnap.docs
-      .filter((productDoc) => productDoc.data().isDeleted !== true)
-      .reduce(
-        (max, productDoc) =>
-          Math.max(max, typeof productDoc.data().sortOrder === 'number' ? productDoc.data().sortOrder : 0),
-        0,
-      )
-    sortOrder = maxSort + 1
+    const activeDocs = allSnap.docs.filter((productDoc) => productDoc.data().isDeleted !== true)
+    const minSort = activeDocs.reduce(
+      (min, productDoc) =>
+        Math.min(min, typeof productDoc.data().sortOrder === 'number' ? productDoc.data().sortOrder : 0),
+      Number.POSITIVE_INFINITY,
+    )
+    sortOrder = Number.isFinite(minSort) ? minSort - 1 : 1
+  } else if (typeof existing?.sortOrder === 'number') {
+    sortOrder = existing.sortOrder
   }
 
   const stripeFields = await adminFetch<StripeSyncResult>('/api/admin/products/save', {
@@ -266,7 +338,7 @@ export async function saveAdminProduct(input: {
     active: input.active,
     sortOrder,
     category: input.category.trim(),
-    media: input.media.filter((item) => item.url.trim()),
+    media: serializeMedia(input.media),
     isDeleted: false,
     stripeProductId: stripeFields.stripeProductId ?? existing?.stripeProductId ?? null,
     stripePriceId: stripeFields.stripePriceId ?? existing?.stripePriceId ?? null,

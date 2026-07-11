@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ProductMedia } from '../data/products'
 
 type ProductGalleryProps = {
@@ -23,6 +23,25 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
   const items = media.filter((item) => item.url.trim())
   const [activeIndex, setActiveIndex] = useState(0)
   const activeItem = items[activeIndex] ?? items[0]
+  const hasMultiple = items.length > 1
+
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [media])
+
+  useEffect(() => {
+    if (activeIndex > items.length - 1) {
+      setActiveIndex(Math.max(0, items.length - 1))
+    }
+  }, [activeIndex, items.length])
+
+  function showPrevious() {
+    setActiveIndex((index) => (index <= 0 ? items.length - 1 : index - 1))
+  }
+
+  function showNext() {
+    setActiveIndex((index) => (index >= items.length - 1 ? 0 : index + 1))
+  }
 
   if (items.length === 0) {
     return <div className="product-gallery-empty" aria-label={`${productName} gallery placeholder`} />
@@ -56,14 +75,40 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
             <track kind="captions" />
           </video>
         )}
+
+        {hasMultiple && (
+          <>
+            <button
+              type="button"
+              className="product-gallery-nav product-gallery-nav-prev"
+              onClick={showPrevious}
+              aria-label="Previous image"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="product-gallery-nav product-gallery-nav-next"
+              onClick={showNext}
+              aria-label="Next image"
+            >
+              ›
+            </button>
+            <p className="product-gallery-count">
+              {activeIndex + 1} / {items.length}
+            </p>
+          </>
+        )}
       </div>
 
-      {items.length > 1 && (
-        <div className="product-gallery-thumbs">
+      {hasMultiple && (
+        <div className="product-gallery-thumbs" role="tablist" aria-label={`${productName} media`}>
           {items.map((item, index) => (
             <button
               key={`${item.url}-${index}`}
               type="button"
+              role="tab"
+              aria-selected={index === activeIndex}
               className={`product-gallery-thumb ${index === activeIndex ? 'is-active' : ''}`}
               onClick={() => setActiveIndex(index)}
               aria-label={`Show media ${index + 1}`}

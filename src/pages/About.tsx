@@ -1,10 +1,9 @@
 import aboutArt from '../assets/hero/Untitled_Artwork(2).webp'
 import PageHeader from '../components/PageHeader'
-import PageSheet from '../components/PageSheet'
 
 export default function About() {
   return (
-    <div className="page page-about scrapbook-page">
+    <div className="page page-about notebook-page">
       <PageHeader title="About" subtitle="A little about me and the charms I make." />
 
       <div className="about-layout">
@@ -20,8 +19,8 @@ export default function About() {
           />
         </figure>
 
-        <PageSheet className="about-copy">
-          <div className="content-block">
+        <div className="about-copy">
+          <div className="about-card content-block">
             <p>
               Hi! I&apos;m the person behind okonani, and I make every charm you see here by hand.
               What started as something small for myself grew into a little shop where I get to share
@@ -37,7 +36,7 @@ export default function About() {
               grateful you stopped by.
             </p>
           </div>
-        </PageSheet>
+        </div>
       </div>
     </div>
   )

@@ -1,14 +1,11 @@
 import { useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import ProductCard from '../components/ProductCard'
-import { GuestRewardsPrompt } from '../components/RewardsPrompt'
-import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { getCategoryById, getCategoryName, storeFilterCategories, useCategories } from '../data/categories'
 import { useProducts } from '../data/products'
 
 export default function Store() {
-  const { user } = useAuth()
   const { addItem } = useCart()
   const { products, loading, error } = useProducts()
   const { categories } = useCategories()
@@ -33,7 +30,7 @@ export default function Store() {
   }
 
   return (
-    <div className="page store-page scrapbook-page">
+    <div className="page store-page notebook-page">
       <PageHeader
         title={activeCategoryMeta?.name ?? 'Store'}
         subtitle={
@@ -41,8 +38,6 @@ export default function Store() {
           'Browse the catalog, filter by category, and add items to your cart.'
         }
       />
-
-      {!user && <GuestRewardsPrompt returnTo="/store" compact />}
 
       <div className="store-body">
       <div className="store-filters" role="tablist" aria-label="Product categories">

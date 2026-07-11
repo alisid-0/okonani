@@ -19,7 +19,7 @@ const Store = lazy(() => import('./pages/Store'))
 
 function PageLoader() {
   return (
-    <div className="page">
+    <div className="page notebook-page">
       <p className="page-loader">Loading…</p>
     </div>
   )

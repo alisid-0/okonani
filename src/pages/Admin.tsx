@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from 'react'
 import { collection, doc } from 'firebase/firestore'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -8,11 +8,13 @@ import {
   deleteAdminProduct,
   listAdminProducts,
   saveAdminProduct,
+  updateProductSortOrders,
   type AdminProduct,
 } from '../lib/adminApi'
 import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
 import ImageCropModal from '../components/ImageCropModal'
+import SortableList from '../components/SortableList'
 import AdminCategories from './AdminCategories'
 import AdminMessages from './AdminMessages'
 import AdminPages from './AdminPages'
@@ -22,7 +24,7 @@ type AdminPanel = 'products' | 'categories' | 'messages' | 'pages'
 
 type PendingCrop =
   | { kind: 'new'; file: File }
-  | { kind: 'replace'; source: string; mediaIndex: number }
+  | { kind: 'existing'; source: string; mediaIndex: number }
 
 type ProductForm = {
   id: string
@@ -31,7 +33,6 @@ type ProductForm = {
   longDescription: string
   price: string
   active: boolean
-  sortOrder: string
   category: string
   media: ProductMedia[]
 }
@@ -43,7 +44,6 @@ const emptyForm = (): ProductForm => ({
   longDescription: '',
   price: '',
   active: true,
-  sortOrder: '0',
   category: '',
   media: [],
 })
@@ -73,8 +73,10 @@ export default function Admin() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [cropQueue, setCropQueue] = useState<PendingCrop[]>([])
+  const [reorderingProducts, setReorderingProducts] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const draftProductIdRef = useRef('')
 
   async function loadProducts(selectId?: string) {
     setLoading(true)
@@ -100,9 +102,7 @@ export default function Admin() {
   }, [])
 
   useEffect(() => {
-    if (!form.id || categories.length === 0) return
-    if (form.category && categories.some((category) => category.id === form.category)) return
-
+    if (form.id || categories.length === 0 || form.category) return
     setForm((prev) => ({ ...prev, category: categories[0].id }))
   }, [categories, form.id, form.category])
 
@@ -110,11 +110,12 @@ export default function Admin() {
     setTab('details')
     setMessage(null)
     setError(null)
+    draftProductIdRef.current = product.id
 
     const resolvedCategory =
       product.category && categories.some((category) => category.id === product.category) ?
         product.category
-      : categories[0]?.id ?? ''
+      : product.category || ''
 
     setForm({
       id: product.id,
@@ -123,16 +124,17 @@ export default function Admin() {
       longDescription: product.longDescription,
       price: (product.priceInCents / 100).toFixed(2),
       active: product.active,
-      sortOrder: String(product.sortOrder),
       category: resolvedCategory,
       media: product.media.length > 0 ? product.media : [],
     })
   }
 
   function startCreate() {
+    const nextId = createProductId()
+    draftProductIdRef.current = nextId
     setForm({
       ...emptyForm(),
-      id: createProductId(),
+      id: nextId,
       category: categories[0]?.id ?? '',
     })
     setTab('details')
@@ -148,13 +150,14 @@ export default function Admin() {
 
     const priceInCents = dollarsToCents(form.price)
 
-    if (!form.category.trim()) {
+    if (!form.category.trim() && categories.length > 0) {
       setError('Choose a category before saving.')
       setSaving(false)
       return
     }
 
     try {
+      const existingProduct = products.find((item) => item.id === form.id)
       const data = await saveAdminProduct({
         id: form.id || undefined,
         name: form.name,
@@ -162,7 +165,7 @@ export default function Admin() {
         longDescription: form.longDescription,
         priceInCents,
         active: form.active,
-        sortOrder: Number.parseInt(form.sortOrder, 10) || 0,
+        sortOrder: existingProduct?.sortOrder ?? 0,
         category: form.category,
         media: form.media.filter((item) => item.url.trim()),
       })
@@ -176,14 +179,20 @@ export default function Admin() {
   }
 
   function ensureProductId(): string {
-    if (form.id.trim()) return form.id
+    if (form.id.trim()) {
+      draftProductIdRef.current = form.id.trim()
+      return form.id.trim()
+    }
+
+    if (draftProductIdRef.current) return draftProductIdRef.current
 
     const nextId = createProductId()
+    draftProductIdRef.current = nextId
     setForm((prev) => ({ ...prev, id: nextId }))
     return nextId
   }
 
-  async function uploadCroppedImage(file: File, mediaIndex?: number) {
+  async function uploadCroppedImage(file: File, replaceAtIndex?: number, originalFile?: File) {
     setUploading(true)
     setError(null)
     setMessage(null)
@@ -197,26 +206,50 @@ export default function Admin() {
         throw new Error('Upload did not return an image URL')
       }
 
+      let sourceUrl: string | undefined
+      if (replaceAtIndex === undefined && originalFile) {
+        const originals = await uploadProductImages(productId, [originalFile])
+        sourceUrl = originals[0]?.url
+      }
+
       setForm((prev) => {
-        if (mediaIndex === undefined) {
-          return { ...prev, id: productId, media: [...prev.media, ...uploaded] }
+        if (replaceAtIndex === undefined) {
+          return {
+            ...prev,
+            id: productId,
+            media: [
+              ...prev.media,
+              {
+                ...nextItem,
+                ...(sourceUrl ? { sourceUrl } : {}),
+              },
+            ],
+          }
         }
+
+        const sourceItem = prev.media[replaceAtIndex]
 
         return {
           ...prev,
           id: productId,
           media: prev.media.map((item, index) =>
-            index === mediaIndex ?
-              { ...item, url: nextItem.url, type: 'image', alt: item.alt || nextItem.alt }
+            index === replaceAtIndex ?
+              {
+                ...item,
+                url: nextItem.url,
+                type: 'image',
+                sourceUrl: sourceItem?.sourceUrl ?? sourceItem?.url,
+                alt: sourceItem?.alt || nextItem.alt,
+              }
             : item,
           ),
         }
       })
 
       setMessage(
-        mediaIndex === undefined ?
-          `Uploaded ${uploaded.length} image${uploaded.length === 1 ? '' : 's'}. Save the product to publish.`
-        : 'Image crop updated. Save the product to publish.',
+        replaceAtIndex === undefined ?
+          `Uploaded image. Save the product to publish.`
+        : 'Store image updated. The original is saved so you can crop again. Save the product to publish.',
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not upload images')
@@ -242,15 +275,17 @@ export default function Admin() {
     event.target.value = ''
   }
 
-  function startCropExisting(mediaIndex: number, url: string) {
-    if (!url.trim()) {
+  function startCropExisting(mediaIndex: number, item: ProductMedia) {
+    const cropSource = (item.sourceUrl ?? item.url).trim()
+
+    if (!cropSource) {
       setError('Add an image URL before cropping.')
       return
     }
 
     setError(null)
     setMessage(null)
-    setCropQueue([{ kind: 'replace', source: url.trim(), mediaIndex }])
+    setCropQueue([{ kind: 'existing', source: cropSource, mediaIndex }])
   }
 
   async function handleCropConfirm(file: File) {
@@ -260,7 +295,7 @@ export default function Admin() {
     setCropQueue((prev) => prev.slice(1))
 
     if (current.kind === 'new') {
-      await uploadCroppedImage(file)
+      await uploadCroppedImage(file, undefined, current.file)
       return
     }
 
@@ -269,6 +304,26 @@ export default function Admin() {
 
   function handleCropCancel() {
     setCropQueue((prev) => prev.slice(1))
+  }
+
+  async function handleReorderProducts(nextProducts: AdminProduct[]) {
+    setReorderingProducts(true)
+    setError(null)
+    setMessage(null)
+
+    const previousProducts = products
+
+    try {
+      const ordered = nextProducts.map((product, index) => ({ ...product, sortOrder: index + 1 }))
+      setProducts(ordered)
+      await updateProductSortOrders(ordered.map((product) => product.id))
+      setMessage('Product order updated.')
+    } catch (err) {
+      setProducts(previousProducts)
+      setError(err instanceof Error ? err.message : 'Could not update product order')
+    } finally {
+      setReorderingProducts(false)
+    }
   }
 
   const activeCrop = cropQueue[0]
@@ -310,8 +365,8 @@ export default function Admin() {
   const cover = getProductCover({ media: form.media })
 
   function categoryName(categoryId: string): string {
-    if (!categoryId) return 'No category'
-    return categories.find((category) => category.id === categoryId)?.name ?? 'Unknown category'
+    if (!categoryId) return 'Uncategorized'
+    return categories.find((category) => category.id === categoryId)?.name ?? 'Uncategorized'
   }
 
   function isCategoryMissing(categoryId: string): boolean {
@@ -323,7 +378,7 @@ export default function Admin() {
       {activeCrop && (
         <ImageCropModal
           source={activeCrop.kind === 'new' ? activeCrop.file : activeCrop.source}
-          replaceExisting={activeCrop.kind === 'replace'}
+          replaceExisting={activeCrop.kind === 'existing'}
           onCancel={handleCropCancel}
           onConfirm={handleCropConfirm}
         />
@@ -375,35 +430,46 @@ export default function Admin() {
           </button>
         </div>
 
+        <p className="admin-sidebar-sort-hint">Drag ⠿ to set storefront order</p>
+
         <div className="admin-sidebar-list">
           {loading && <p className="admin-sidebar-empty">Loading…</p>}
           {!loading && products.length === 0 && (
             <p className="admin-sidebar-empty">No products yet.</p>
           )}
 
-          {products.map((product) => {
-            const thumb = getProductCover(product)
-            return (
-              <button
-                key={product.id}
-                type="button"
-                className={`admin-sidebar-item ${selectedId === product.id ? 'is-selected' : ''}`}
-                onClick={() => selectProduct(product)}
-              >
-                <span className="admin-sidebar-thumb">
-                  {thumb ?
-                    <img src={thumb} alt="" />
-                  : <span aria-hidden="true">✿</span>}
-                </span>
-                <span className="admin-sidebar-copy">
-                  <strong>{product.name}</strong>
-                  <span className={isCategoryMissing(product.category) ? 'admin-warning-text' : undefined}>
-                    {categoryName(product.category)} · {product.active ? 'Live' : 'Hidden'}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
+          {!loading && products.length > 0 && (
+            <SortableList
+              className="admin-sidebar-sortable"
+              rowClassName="admin-sidebar-sortable-row"
+              ariaLabel="Products"
+              items={products}
+              onReorder={handleReorderProducts}
+              renderItem={(product) => {
+                const thumb = getProductCover(product)
+                return (
+                  <button
+                    type="button"
+                    className={`admin-sidebar-item ${selectedId === product.id ? 'is-selected' : ''}`}
+                    onClick={() => selectProduct(product)}
+                    disabled={reorderingProducts}
+                  >
+                    <span className="admin-sidebar-thumb">
+                      {thumb ?
+                        <img src={thumb} alt="" />
+                      : <span aria-hidden="true">✿</span>}
+                    </span>
+                    <span className="admin-sidebar-copy">
+                      <strong>{product.name}</strong>
+                      <span className={isCategoryMissing(product.category) ? 'admin-warning-text' : undefined}>
+                        {categoryName(product.category)} · {product.active ? 'Live' : 'Hidden'}
+                      </span>
+                    </span>
+                  </button>
+                )
+              }}
+            />
+          )}
         </div>
           </>
         )}
@@ -512,23 +578,20 @@ export default function Admin() {
                   <select
                     value={form.category}
                     onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-                    required
+                    required={categories.length > 0}
                   >
                     {categories.length === 0 && <option value="">No categories yet</option>}
+                    {categories.length > 0 && !categories.some((category) => category.id === form.category) && (
+                      <option value={form.category || ''}>
+                        {form.category ? 'Uncategorized (pick a category)' : 'Select a category'}
+                      </option>
+                    )}
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}
                       </option>
                     ))}
                   </select>
-                </label>
-                <label>
-                  Sort order
-                  <input
-                    type="number"
-                    value={form.sortOrder}
-                    onChange={(e) => setForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
-                  />
                 </label>
                 <label className="admin-toggle">
                   <input
@@ -559,7 +622,7 @@ export default function Admin() {
               <div className="admin-card-header">
                 <div>
                   <h2>Gallery & media</h2>
-                  <p>Upload images to Firebase Storage, or paste a video URL. Crop any image before or after upload. The first image is the store thumbnail.</p>
+                  <p>Upload images to Firebase Storage, or paste a video URL. Cropping updates the store image but keeps the original for re-cropping. The first image is the store thumbnail.</p>
                 </div>
                 <div className="admin-media-header-actions">
                   <label className="admin-upload-label">
@@ -657,7 +720,7 @@ export default function Admin() {
                           type="button"
                           className="btn btn-outline btn-sm"
                           disabled={uploading || cropQueue.length > 0}
-                          onClick={() => startCropExisting(index, item.url)}
+                          onClick={() => startCropExisting(index, item)}
                         >
                           Crop
                         </button>

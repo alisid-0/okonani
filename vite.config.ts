@@ -44,6 +44,11 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               rewrite: () => '/adminUploadMedia',
             },
+            '/api/admin/media/read': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminReadMedia',
+            },
             '/api/create-checkout-session': {
               target: functionsOrigin,
               changeOrigin: true,

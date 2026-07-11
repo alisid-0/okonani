@@ -351,6 +351,96 @@ exports.adminUploadMedia = onRequest(
   }
 })
 
+function parseStorageObjectFromUrl(urlString) {
+  let parsed
+
+  try {
+    parsed = new URL(urlString)
+  } catch {
+    return null
+  }
+
+  if (!parsed.hostname.includes('firebasestorage.googleapis.com')) {
+    return null
+  }
+
+  const match = parsed.pathname.match(/^\/v0\/b\/([^/]+)\/o\/(.+)$/)
+  if (!match) return null
+
+  const bucket = decodeURIComponent(match[1])
+  const objectPath = decodeURIComponent(match[2])
+
+  if (bucket !== getStorageBucketName()) return null
+  if (!objectPath.startsWith('products/')) return null
+
+  return { bucket, objectPath }
+}
+
+exports.adminReadMedia = onRequest(
+  { ...httpOptions, secrets: [adminEmailsSecret], memory: '512MiB', timeoutSeconds: 120 },
+  async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res, 'POST')
+      return
+    }
+
+    try {
+      await requireAdminRequest(req)
+
+      const url = String(req.body?.url ?? '').trim()
+      const objectRef = parseStorageObjectFromUrl(url)
+
+      if (!objectRef) {
+        res.status(400).json({ error: 'Invalid product image URL' })
+        return
+      }
+
+      const bucket = getStorage().bucket(objectRef.bucket)
+      const file = bucket.file(objectRef.objectPath)
+      const [exists] = await file.exists()
+
+      if (!exists) {
+        res.status(404).json({ error: 'Image not found in storage' })
+        return
+      }
+
+      const [buffer] = await file.download()
+      const [metadata] = await file.getMetadata()
+      const contentType =
+        typeof metadata.contentType === 'string' && metadata.contentType.startsWith('image/') ?
+          metadata.contentType
+        : 'image/jpeg'
+
+      if (buffer.length > 10 * 1024 * 1024) {
+        res.status(400).json({ error: 'Image must be under 10 MB' })
+        return
+      }
+
+      res.json({
+        contentType,
+        dataBase64: buffer.toString('base64'),
+      })
+    } catch (err) {
+      console.error('Media read error:', err)
+
+      if (storageSetupError(err)) {
+        res.status(503).json({
+          error:
+            'Firebase Storage is not set up yet. In Firebase Console open Storage → Get started, then run: firebase deploy --only storage',
+        })
+        return
+      }
+
+      sendHttpError(res, err)
+    }
+  },
+)
+
 exports.createCheckoutSession = onRequest({ region, cors: true, invoker: 'public', secrets: [stripeSecretKey] }, async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.status(204).send('')

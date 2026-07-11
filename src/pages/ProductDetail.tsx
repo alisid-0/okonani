@@ -55,7 +55,7 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="page product-detail-page">
+      <div className="page product-detail-page notebook-page">
         <p className="product-detail-status">Loading product…</p>
       </div>
     )
@@ -63,7 +63,7 @@ export default function ProductDetail() {
 
   if (error || !product) {
     return (
-      <div className="page product-detail-page">
+      <div className="page product-detail-page notebook-page">
         <div className="product-detail-shell">
           <p className="product-detail-status">{error ?? 'This item is unavailable.'}</p>
           <Link to="/store" className="btn btn-primary">
@@ -75,7 +75,7 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="page product-detail-page">
+    <div className="page product-detail-page notebook-page">
       <nav className="product-breadcrumb" aria-label="Breadcrumb">
         <Link to="/store">Store</Link>
         <span aria-hidden="true">/</span>

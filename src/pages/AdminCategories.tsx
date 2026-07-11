@@ -1,8 +1,10 @@
 import { type FormEvent, useEffect, useState } from 'react'
+import SortableList from '../components/SortableList'
 import {
   deleteAdminCategory,
   listAdminCategories,
   saveAdminCategory,
+  updateCategorySortOrders,
 } from '../lib/adminApi'
 import type { StoreCategory } from '../data/categories'
 
@@ -13,7 +15,6 @@ type CategoryForm = {
   showOnHome: boolean
   showInStore: boolean
   homeProductLimit: string
-  sortOrder: string
   active: boolean
 }
 
@@ -24,7 +25,6 @@ const emptyCategoryForm = (): CategoryForm => ({
   showOnHome: true,
   showInStore: true,
   homeProductLimit: '4',
-  sortOrder: '0',
   active: true,
 })
 
@@ -41,6 +41,7 @@ export default function AdminCategories() {
   const [form, setForm] = useState<CategoryForm>(emptyCategoryForm())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [reordering, setReordering] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -75,7 +76,6 @@ export default function AdminCategories() {
       showOnHome: category.showOnHome,
       showInStore: category.showInStore,
       homeProductLimit: String(category.homeProductLimit),
-      sortOrder: String(category.sortOrder),
       active: category.active,
     })
     setMessage(null)
@@ -89,6 +89,7 @@ export default function AdminCategories() {
     setMessage(null)
 
     const categoryId = form.id.trim() || slugify(form.name)
+    const existingCategory = categories.find((category) => category.id === categoryId)
 
     try {
       await saveAdminCategory({
@@ -98,7 +99,7 @@ export default function AdminCategories() {
         showOnHome: form.showOnHome,
         showInStore: form.showInStore,
         homeProductLimit: Number.parseInt(form.homeProductLimit, 10) || 4,
-        sortOrder: Number.parseInt(form.sortOrder, 10) || 0,
+        sortOrder: existingCategory?.sortOrder ?? 0,
         active: form.active,
       })
       setMessage(`Saved category "${form.name}".`)
@@ -112,14 +113,41 @@ export default function AdminCategories() {
   }
 
   async function handleDelete(category: StoreCategory) {
-    if (!window.confirm(`Hide category "${category.name}"? Products keep their tag.`)) return
+    if (
+      !window.confirm(
+        `Remove category "${category.name}"? Products in this category stay in the store, but become uncategorized.`,
+      )
+    ) {
+      return
+    }
 
     try {
       await deleteAdminCategory(category.id)
       setMessage(`Removed "${category.name}".`)
+      if (form.id === category.id) setForm(emptyCategoryForm())
       await loadCategories()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove category')
+    }
+  }
+
+  async function handleReorderCategories(nextCategories: StoreCategory[]) {
+    setReordering(true)
+    setError(null)
+    setMessage(null)
+
+    const previousCategories = categories
+
+    try {
+      const ordered = nextCategories.map((category, index) => ({ ...category, sortOrder: index + 1 }))
+      setCategories(ordered)
+      await updateCategorySortOrders(ordered.map((category) => category.id))
+      setMessage('Category order updated.')
+    } catch (err) {
+      setCategories(previousCategories)
+      setError(err instanceof Error ? err.message : 'Could not update category order')
+    } finally {
+      setReordering(false)
     }
   }
 
@@ -175,15 +203,6 @@ export default function AdminCategories() {
               rows={2}
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-            />
-          </label>
-
-          <label>
-            Sort order
-            <input
-              type="number"
-              value={form.sortOrder}
-              onChange={(e) => setForm((prev) => ({ ...prev, sortOrder: e.target.value }))}
             />
           </label>
 
@@ -243,32 +262,50 @@ export default function AdminCategories() {
 
         <div className="admin-card">
           <h2>All categories</h2>
+          <p className="admin-field-hint">Drag ⠿ to set home page and store filter order.</p>
           {loading && <p>Loading…</p>}
           {!loading && categories.length === 0 && (
             <p className="admin-empty-copy">No categories yet. Create New arrivals and Best sellers to get started.</p>
           )}
 
-          <ul className="admin-category-list">
-            {categories.map((category) => (
-              <li key={category.id} className="admin-category-item">
-                <div>
-                  <strong>{category.name}</strong>
-                  <p className="admin-meta">
-                    {category.id} · home {category.showOnHome ? `${category.homeProductLimit} products` : 'off'} · store{' '}
-                    {category.showInStore ? 'on' : 'off'}
-                  </p>
+          {!loading && categories.length > 0 && (
+            <SortableList
+              className="admin-category-sortable"
+              rowClassName="admin-category-sortable-row"
+              ariaLabel="Categories"
+              items={categories}
+              onReorder={handleReorderCategories}
+              renderItem={(category) => (
+                <div className="admin-category-item">
+                  <div>
+                    <strong>{category.name}</strong>
+                    <p className="admin-meta">
+                      {category.id} · home {category.showOnHome ? `${category.homeProductLimit} products` : 'off'} · store{' '}
+                      {category.showInStore ? 'on' : 'off'}
+                    </p>
+                  </div>
+                  <div className="admin-item-actions">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => startEdit(category)}
+                      disabled={reordering}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => handleDelete(category)}
+                      disabled={reordering}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <div className="admin-item-actions">
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEdit(category)}>
-                    Edit
-                  </button>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDelete(category)}>
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+              )}
+            />
+          )}
         </div>
       </div>
     </div>

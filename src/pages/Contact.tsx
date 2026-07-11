@@ -31,7 +31,7 @@ export default function Contact() {
   }
 
   return (
-    <div className="page page-narrow page-contact scrapbook-page">
+    <div className="page page-narrow page-contact notebook-page">
       <PageHeader title="Contact" subtitle="Questions, custom orders, or just saying hi! I'd love to hear from you." />
 
       <PageSheet>

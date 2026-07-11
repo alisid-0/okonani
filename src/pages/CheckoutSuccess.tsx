@@ -28,7 +28,7 @@ export default function CheckoutSuccess() {
   }, [sessionId, clearCart])
 
   return (
-    <div className="page page-narrow">
+    <div className="page page-narrow notebook-page">
       <PageHeader title="Thank you" subtitle="Your payment was received." />
 
       <PageSheet className="page-stack">

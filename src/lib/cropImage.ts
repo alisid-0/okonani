@@ -1,49 +1,17 @@
-export type CropState = {
-  zoom: number
-  offsetX: number
-  offsetY: number
-}
+import type { Area } from 'react-easy-crop'
 
-export const DEFAULT_CROP_STATE: CropState = {
-  zoom: 1,
-  offsetX: 0,
-  offsetY: 0,
-}
-
-function loadImage(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const image = new Image()
-
-    image.onload = () => {
-      URL.revokeObjectURL(url)
-      resolve(image)
-    }
-
-    image.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Could not load image'))
-    }
-
-    image.src = url
-  })
-}
-
-function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
+function loadImage(imageSrc: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
-    image.crossOrigin = 'anonymous'
+
+    if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://')) {
+      image.crossOrigin = 'anonymous'
+    }
 
     image.onload = () => resolve(image)
     image.onerror = () => reject(new Error('Could not load image'))
-
-    image.src = url
+    image.src = imageSrc
   })
-}
-
-async function loadImageSource(source: File | string): Promise<HTMLImageElement> {
-  if (typeof source === 'string') return loadImageFromUrl(source)
-  return loadImage(source)
 }
 
 function sourceBaseName(source: File | string, fallback = 'product-image'): string {
@@ -57,31 +25,27 @@ function sourceBaseName(source: File | string, fallback = 'product-image'): stri
   return source.name.replace(/\.[^.]+$/, '') || fallback
 }
 
-export async function cropImageSource(
+export async function exportCroppedImageFile(
+  imageSrc: string,
+  pixelCrop: Area,
   source: File | string,
-  crop: CropState,
   outputSize = 1200,
 ): Promise<File> {
-  const image = await loadImageSource(source)
+  const image = await loadImage(imageSrc)
   const canvas = document.createElement('canvas')
   canvas.width = outputSize
   canvas.height = outputSize
 
-  const context = canvas.getContext('2d')
+  const context = canvas.getContext('2d', { alpha: true })
   if (!context) throw new Error('Could not prepare image crop')
 
-  const baseCropSize = Math.min(image.width, image.height) / crop.zoom
-  const maxOffsetX = Math.max(0, (image.width - baseCropSize) / 2)
-  const maxOffsetY = Math.max(0, (image.height - baseCropSize) / 2)
-  const sourceX = (image.width - baseCropSize) / 2 + crop.offsetX * maxOffsetX
-  const sourceY = (image.height - baseCropSize) / 2 + crop.offsetY * maxOffsetY
-
+  context.clearRect(0, 0, outputSize, outputSize)
   context.drawImage(
     image,
-    sourceX,
-    sourceY,
-    baseCropSize,
-    baseCropSize,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
     0,
     0,
     outputSize,
@@ -98,20 +62,11 @@ export async function cropImageSource(
 
         resolve(result)
       },
-      'image/jpeg',
-      0.92,
+      'image/png',
     )
   })
 
   const baseName = sourceBaseName(source)
 
-  return new File([blob], `${baseName}-cropped.jpg`, { type: 'image/jpeg' })
-}
-
-export async function cropImageFile(
-  file: File,
-  crop: CropState,
-  outputSize = 1200,
-): Promise<File> {
-  return cropImageSource(file, crop, outputSize)
+  return new File([blob], `${baseName}-cropped.png`, { type: 'image/png' })
 }

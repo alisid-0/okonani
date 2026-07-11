@@ -4,7 +4,7 @@ import PageSheet from '../components/PageSheet'
 
 export default function CheckoutCancel() {
   return (
-    <div className="page page-narrow">
+    <div className="page page-narrow notebook-page">
       <PageHeader title="Checkout canceled" subtitle="No payment was made." />
 
       <PageSheet className="page-stack">
