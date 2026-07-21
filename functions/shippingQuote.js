@@ -1,9 +1,12 @@
-const { PACKAGE_DIMS } = require('./packaging')
+const { PACKAGE_DIMS, resolveProfile } = require('./packaging')
 
 const DEFAULT_LETTER_SETTINGS = {
   letterFlatFeeCents: 150,
   letterMaxItems: 10,
 }
+
+/** Empty bubble mailer packaging weight (oz), similar to Etsy package weight. */
+const BUBBLE_MAILER_TARE_OZ = 0.5
 
 function isLetterEligible(product, productTypes) {
   const productType = product?.productTypeId
@@ -20,8 +23,28 @@ function isLetterEligible(product, productTypes) {
   return product?.shipClass === 'letter'
 }
 
+/** Sum of each line's product weight × quantity (uses admin weightOz / ship-class defaults). */
+function totalItemsWeightOz(lines) {
+  const safeLines = Array.isArray(lines) ? lines.filter((line) => line && line.quantity > 0) : []
+  let total = 0
+
+  for (const line of safeLines) {
+    const qty = Math.max(1, Math.round(Number(line.quantity) || 1))
+    const profile = resolveProfile(line.product || {})
+    total += profile.weightOz * qty
+  }
+
+  return Math.round(total * 100) / 100
+}
+
+function bubbleMailerWeightOz(itemWeightOz) {
+  // Item weights + mailer packaging; Shippo needs a positive parcel weight.
+  return Math.max(1, Math.round((itemWeightOz + BUBBLE_MAILER_TARE_OZ) * 100) / 100)
+}
+
 function decidePackaging(lines, productTypes = [], letterMaxItems = 10) {
   const safeLines = Array.isArray(lines) ? lines.filter((line) => line && line.quantity > 0) : []
+  const itemsWeightOz = totalItemsWeightOz(safeLines)
 
   if (safeLines.length === 0) {
     return {
@@ -29,7 +52,8 @@ function decidePackaging(lines, productTypes = [], letterMaxItems = 10) {
       postageMode: 'label',
       reason: 'No items — default to bubble mailer.',
       dims: PACKAGE_DIMS.bubble_mailer,
-      weightOz: 1,
+      weightOz: bubbleMailerWeightOz(0),
+      itemsWeightOz: 0,
       shipClasses: [],
     }
   }
@@ -54,7 +78,8 @@ function decidePackaging(lines, productTypes = [], letterMaxItems = 10) {
       postageMode: 'stamp',
       reason: `${totalQty} letter item${totalQty === 1 ? '' : 's'} (max ${maxItems}) — flat letter rate.`,
       dims: PACKAGE_DIMS.envelope,
-      weightOz: 1,
+      weightOz: Math.max(0.1, itemsWeightOz),
+      itemsWeightOz,
       shipClasses: [...shipClasses],
     }
   }
@@ -66,7 +91,8 @@ function decidePackaging(lines, productTypes = [], letterMaxItems = 10) {
       ? `More than ${maxItems} letter items — upgrade to bubble mailer (live Shippo rates).`
       : 'Order includes non-letter items — bubble mailer (live Shippo rates).',
     dims: PACKAGE_DIMS.bubble_mailer,
-    weightOz: Math.max(1, totalQty * 0.15),
+    weightOz: bubbleMailerWeightOz(itemsWeightOz),
+    itemsWeightOz,
     shipClasses: [...shipClasses],
   }
 }
@@ -175,9 +201,12 @@ function parseShippingType(id, data = {}) {
 
 module.exports = {
   DEFAULT_LETTER_SETTINGS,
+  BUBBLE_MAILER_TARE_OZ,
   decidePackaging,
   quoteShipping,
   isLetterEligible,
+  totalItemsWeightOz,
+  bubbleMailerWeightOz,
   parseProductType,
   parseShippingType,
 }

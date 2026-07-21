@@ -1,6 +1,12 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { db } from '../lib/firebase'
+import {
+  parseOptionGroups,
+  parseOptionsMode,
+  type ProductOptionGroup,
+  type ProductOptionsMode,
+} from './productOptions'
 
 export type ProductMedia = {
   url: string
@@ -36,6 +42,47 @@ export type Product = {
   weightOz?: number
   thicknessIn?: number
   maxLetterQty?: number
+  /** When true, stockQuantity limits how many can be sold. When false/omitted, unlimited. */
+  trackStock?: boolean
+  /** Remaining units when trackStock is true. */
+  stockQuantity?: number
+  /** inherit = use product type options; custom = use optionGroups; none = no options */
+  optionsMode?: ProductOptionsMode
+  /** Used when optionsMode is custom */
+  optionGroups?: ProductOptionGroup[]
+}
+
+const MAX_CART_QTY = 99
+
+export function productTracksStock(
+  product: Pick<Product, 'trackStock'> | null | undefined,
+): boolean {
+  return product?.trackStock === true
+}
+
+/** Remaining stock, or null when the product is not inventory-limited. */
+export function availableStock(
+  product: Pick<Product, 'trackStock' | 'stockQuantity'> | null | undefined,
+): number | null {
+  if (!productTracksStock(product)) return null
+  const qty = Math.floor(Number(product?.stockQuantity) || 0)
+  return Math.max(0, qty)
+}
+
+export function isProductSoldOut(
+  product: Pick<Product, 'trackStock' | 'stockQuantity'> | null | undefined,
+): boolean {
+  const stock = availableStock(product)
+  return stock !== null && stock <= 0
+}
+
+/** Max units shoppable for this product (ignores other cart lines). */
+export function maxOrderQuantity(
+  product: Pick<Product, 'trackStock' | 'stockQuantity'> | null | undefined,
+): number {
+  const stock = availableStock(product)
+  if (stock === null) return MAX_CART_QTY
+  return Math.min(MAX_CART_QTY, stock)
 }
 
 export function formatPrice(priceInCents: number): string {
@@ -122,6 +169,13 @@ export function parseProduct(id: string, data: Record<string, unknown>): Product
     weightOz: typeof data.weightOz === 'number' ? data.weightOz : undefined,
     thicknessIn: typeof data.thicknessIn === 'number' ? data.thicknessIn : undefined,
     maxLetterQty: typeof data.maxLetterQty === 'number' ? data.maxLetterQty : undefined,
+    trackStock: data.trackStock === true,
+    stockQuantity:
+      typeof data.stockQuantity === 'number' && Number.isFinite(data.stockQuantity)
+        ? Math.max(0, Math.floor(data.stockQuantity))
+        : undefined,
+    optionsMode: parseOptionsMode(data.optionsMode),
+    optionGroups: parseOptionGroups(data.optionGroups),
   }
 }
 

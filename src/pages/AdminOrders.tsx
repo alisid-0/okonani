@@ -402,10 +402,19 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                   <ul className="admin-orders-items">
                     {selected.items.map((item, index) => (
                       <li key={`${item.productId || item.name}-${index}`}>
-                        {item.quantity} × {item.name}{' '}
-                        <span>
-                          {formatPrice(item.amountCents || item.unitAmountCents * item.quantity)}
-                        </span>
+                        <div>
+                          {item.quantity} × {item.name}{' '}
+                          <span>
+                            {formatPrice(item.amountCents || item.unitAmountCents * item.quantity)}
+                          </span>
+                          {item.selectedOptions.length > 0 && (
+                            <p className="admin-orders-item-options">
+                              {item.selectedOptions
+                                .map((option) => `${option.groupName}: ${option.choiceLabel}`)
+                                .join(' · ')}
+                            </p>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>

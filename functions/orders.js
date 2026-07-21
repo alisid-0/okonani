@@ -63,6 +63,22 @@ async function loadProductsByStripePriceIds(priceIds) {
   return byPriceId
 }
 
+async function loadProductsByIds(productIds) {
+  const unique = [...new Set(productIds.filter(Boolean))]
+  const byId = new Map()
+
+  await Promise.all(
+    unique.map(async (productId) => {
+      const snap = await getDb().collection('products').doc(productId).get()
+      if (snap.exists) {
+        byId.set(productId, { id: snap.id, ...snap.data() })
+      }
+    }),
+  )
+
+  return byId
+}
+
 async function loadShippingCatalog() {
   const [shippingSnap, productTypeSnap] = await Promise.all([
     getDb().collection('shippingTypes').get(),
@@ -93,33 +109,68 @@ async function persistCheckoutOrder(stripe, session) {
   }
 
   const expanded = await stripe.checkout.sessions.retrieve(session.id, {
-    expand: ['line_items.data.price', 'shipping_cost.shipping_rate'],
+    expand: ['line_items.data.price.product', 'shipping_cost.shipping_rate'],
   })
 
   const lineItems = expanded.line_items?.data ?? []
   const priceIds = lineItems
-    .map((item) => (typeof item.price === 'object' && item.price?.id ? item.price.id : null))
+    .map((item) => {
+      const price = typeof item.price === 'object' ? item.price : null
+      const stripeProduct = price && typeof price.product === 'object' ? price.product : null
+      const metaPriceId = stripeProduct?.metadata?.stripePriceId
+      return metaPriceId || (price?.id ? price.id : null)
+    })
     .filter(Boolean)
 
-  const [productsByPrice, catalog] = await Promise.all([
+  const productIds = lineItems
+    .map((item) => {
+      const price = typeof item.price === 'object' ? item.price : null
+      const stripeProduct = price && typeof price.product === 'object' ? price.product : null
+      return typeof stripeProduct?.metadata?.productId === 'string'
+        ? stripeProduct.metadata.productId
+        : null
+    })
+    .filter(Boolean)
+
+  const [productsByPrice, productsById, catalog] = await Promise.all([
     loadProductsByStripePriceIds(priceIds),
+    loadProductsByIds(productIds),
     loadShippingCatalog(),
   ])
 
   const items = lineItems.map((item) => {
     const price = typeof item.price === 'object' ? item.price : null
     const priceId = price?.id || ''
-    const product = productsByPrice.get(priceId)
+    const stripeProduct = price && typeof price.product === 'object' ? price.product : null
+    const meta = stripeProduct?.metadata || {}
+    const catalogPriceId = typeof meta.stripePriceId === 'string' ? meta.stripePriceId : priceId
+    const productFromPrice = productsByPrice.get(catalogPriceId) || productsByPrice.get(priceId)
+    const productFromMeta =
+      typeof meta.productId === 'string' && meta.productId
+        ? productsById.get(meta.productId)
+        : null
+    const product = productFromMeta || productFromPrice
     const quantity = item.quantity || 1
 
+    let selectedOptions = []
+    if (typeof meta.selectedOptions === 'string' && meta.selectedOptions) {
+      try {
+        const parsed = JSON.parse(meta.selectedOptions)
+        if (Array.isArray(parsed)) selectedOptions = parsed
+      } catch {
+        selectedOptions = []
+      }
+    }
+
     return {
-      productId: product?.id || null,
+      productId: product?.id || meta.productId || null,
       name: item.description || product?.name || 'Item',
       quantity,
       unitAmountCents:
         typeof price?.unit_amount === 'number' ? price.unit_amount : product?.priceInCents || 0,
       amountCents: typeof item.amount_total === 'number' ? item.amount_total : 0,
-      stripePriceId: priceId || null,
+      stripePriceId: catalogPriceId || priceId || null,
+      selectedOptions,
       productTypeId: typeof product?.productTypeId === 'string' ? product.productTypeId : '',
       shipClass: normalizeShipClass(product?.shipClass),
       weightOz: typeof product?.weightOz === 'number' ? product.weightOz : null,
@@ -270,5 +321,6 @@ module.exports = {
   mapStripeAddress,
   resolveShippingAddress,
   loadProductsByStripePriceIds,
+  loadProductsByIds,
   loadShippingCatalog,
 }

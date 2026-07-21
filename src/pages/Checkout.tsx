@@ -27,6 +27,9 @@ export default function Checkout() {
         .map((line) => ({
           stripePriceId: line.product.stripePriceId!,
           quantity: line.quantity,
+          productId: line.product.id,
+          productName: line.product.name,
+          selectedOptions: line.selectedOptions,
         })),
     [lines],
   )

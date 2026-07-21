@@ -6,12 +6,14 @@ import { GuestCheckoutGate, GuestRewardsPrompt } from '../components/RewardsProm
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useShopPause } from '../context/ShopPauseContext'
-import { formatPrice, getProductCover } from '../data/products'
+import { formatPrice, getProductCover, maxOrderQuantity } from '../data/products'
+import { formatSelectedOptions, unitPriceWithOptions } from '../data/productOptions'
+import ProtectedImage from '../components/ProtectedImage'
 import { getRewardsSummary, type RewardsSummary } from '../lib/rewardsApi'
 
 export default function Cart() {
   const { user } = useAuth()
-  const { lines, subtotalCents, updateQuantity, removeItem } = useCart()
+  const { lines, subtotalCents, updateQuantity, removeItem, quantityForProduct } = useCart()
   const { shoppingPaused, showPausedModal } = useShopPause()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -118,17 +120,23 @@ export default function Cart() {
           <ul className="cart-list">
             {lines.map((line) => {
               const cover = getProductCover(line.product)
-              const lineTotal = line.product.priceInCents * line.quantity
+              const unitCents = unitPriceWithOptions(line.product.priceInCents, line.selectedOptions)
+              const lineTotal = unitCents * line.quantity
+              const optionsLabel = formatSelectedOptions(line.selectedOptions)
+              const maxForProduct = maxOrderQuantity(line.product)
+              const usedElsewhere = quantityForProduct(line.product.id, line.lineKey)
+              const maxForLine = Math.max(0, maxForProduct - usedElsewhere)
+              const atStockMax = line.product.trackStock === true && line.quantity >= maxForLine
 
               return (
-                <li key={line.product.id} className="cart-item">
+                <li key={line.lineKey} className="cart-item">
                   <Link
                     to={`/store/${line.product.id}`}
                     className="cart-item-image"
                     aria-label={`View ${line.product.name}`}
                   >
                     {cover ?
-                      <img src={cover} alt="" />
+                      <ProtectedImage src={cover} alt="" />
                     : <span className="cart-item-image-placeholder" aria-hidden="true">
                         ✿
                       </span>
@@ -139,11 +147,17 @@ export default function Cart() {
                     <Link to={`/store/${line.product.id}`} className="cart-item-name">
                       {line.product.name}
                     </Link>
-                    <p className="cart-item-unit">{formatPrice(line.product.priceInCents)} each</p>
+                    {optionsLabel && <p className="cart-item-options">{optionsLabel}</p>}
+                    <p className="cart-item-unit">{formatPrice(unitCents)} each</p>
+                    {line.product.trackStock === true && (
+                      <p className="cart-item-stock">
+                        {maxForProduct <= 0 ? 'Sold out' : `${maxForProduct} in stock`}
+                      </p>
+                    )}
                     <button
                       type="button"
                       className="cart-item-remove"
-                      onClick={() => removeItem(line.product.id)}
+                      onClick={() => removeItem(line.lineKey)}
                     >
                       Remove
                     </button>
@@ -155,7 +169,7 @@ export default function Cart() {
                         type="button"
                         className="cart-qty-btn"
                         aria-label={`Decrease quantity of ${line.product.name}`}
-                        onClick={() => updateQuantity(line.product.id, Math.max(1, line.quantity - 1))}
+                        onClick={() => updateQuantity(line.lineKey, Math.max(1, line.quantity - 1))}
                       >
                         −
                       </button>
@@ -164,7 +178,10 @@ export default function Cart() {
                         type="button"
                         className="cart-qty-btn"
                         aria-label={`Increase quantity of ${line.product.name}`}
-                        onClick={() => updateQuantity(line.product.id, Math.min(99, line.quantity + 1))}
+                        disabled={atStockMax}
+                        onClick={() =>
+                          updateQuantity(line.lineKey, Math.min(maxForLine, line.quantity + 1))
+                        }
                       >
                         +
                       </button>

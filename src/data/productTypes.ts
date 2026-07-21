@@ -1,6 +1,7 @@
 import { collection, getDocs } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
 import { db } from '../lib/firebase'
+import { parseOptionGroups, type ProductOptionGroup } from './productOptions'
 
 export type ProductType = {
   id: string
@@ -11,6 +12,8 @@ export type ProductType = {
   /** Stickers/sheets: count toward the ≤10 untracked letter option. */
   shipsAsLetter: boolean
   maxLetterQty: number
+  /** Default option groups (color, pairings, etc.) inherited by products of this type. */
+  optionGroups: ProductOptionGroup[]
   sortOrder: number
   active: boolean
 }
@@ -25,6 +28,7 @@ export const DEFAULT_PRODUCT_TYPES: Array<Omit<ProductType, 'id'> & { id: string
     shippingTypeId: 'letter',
     shipsAsLetter: true,
     maxLetterQty: 10,
+    optionGroups: [],
     sortOrder: 1,
     active: true,
   },
@@ -36,6 +40,7 @@ export const DEFAULT_PRODUCT_TYPES: Array<Omit<ProductType, 'id'> & { id: string
     shippingTypeId: 'letter',
     shipsAsLetter: true,
     maxLetterQty: 10,
+    optionGroups: [],
     sortOrder: 2,
     active: true,
   },
@@ -47,6 +52,7 @@ export const DEFAULT_PRODUCT_TYPES: Array<Omit<ProductType, 'id'> & { id: string
     shippingTypeId: 'bubble-mailer',
     shipsAsLetter: false,
     maxLetterQty: 0,
+    optionGroups: [],
     sortOrder: 3,
     active: true,
   },
@@ -70,6 +76,7 @@ export function parseProductType(id: string, data: Record<string, unknown>): Pro
     shippingTypeId,
     shipsAsLetter,
     maxLetterQty: Math.max(0, Math.round(Number(data.maxLetterQty) || 0)),
+    optionGroups: parseOptionGroups(data.optionGroups),
     sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : 0,
     active: data.active !== false,
   }

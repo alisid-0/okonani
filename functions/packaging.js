@@ -26,15 +26,16 @@ function normalizeShipClass(value) {
 function resolveProfile(product) {
   const shipClass = normalizeShipClass(product?.shipClass)
   const defaults = DEFAULT_PROFILES[shipClass]
+  const rawWeight = Number(product?.weightOz)
   const weightOz =
-    typeof product?.weightOz === 'number' && product.weightOz > 0 ? product.weightOz : defaults.weightOz
+    Number.isFinite(rawWeight) && rawWeight > 0 ? rawWeight : defaults.weightOz
+  const rawThickness = Number(product?.thicknessIn)
   const thicknessIn =
-    typeof product?.thicknessIn === 'number' && product.thicknessIn >= 0
-      ? product.thicknessIn
-      : defaults.thicknessIn
+    Number.isFinite(rawThickness) && rawThickness >= 0 ? rawThickness : defaults.thicknessIn
+  const rawMaxLetter = Number(product?.maxLetterQty)
   const maxLetterQty =
-    typeof product?.maxLetterQty === 'number' && product.maxLetterQty >= 0
-      ? Math.round(product.maxLetterQty)
+    Number.isFinite(rawMaxLetter) && rawMaxLetter >= 0
+      ? Math.round(rawMaxLetter)
       : defaults.maxLetterQty
 
   return { shipClass, weightOz, thicknessIn, maxLetterQty }

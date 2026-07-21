@@ -1,91 +1,153 @@
-import { useSearchParams } from 'react-router-dom'
+import { useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import ProductCard from '../components/ProductCard'
 import { useCart } from '../context/CartContext'
-import { getCategoryById, getCategoryName, storeFilterCategories, useCategories } from '../data/categories'
+import {
+  getCategoryById,
+  getCategoryName,
+  storeFilterCategories,
+  useCategories,
+} from '../data/categories'
+import { productHasConfigurableOptions } from '../data/productOptions'
 import { useProducts } from '../data/products'
+import { getProductTypeById, useProductTypes } from '../data/productTypes'
 
 export default function Store() {
+  const navigate = useNavigate()
   const { addItem } = useCart()
   const { products, loading, error } = useProducts()
   const { categories } = useCategories()
+  const { productTypes } = useProductTypes()
   const [searchParams, setSearchParams] = useSearchParams()
+
   const activeCategory = searchParams.get('category') ?? 'all'
+  const activeType = searchParams.get('type') ?? 'all'
   const storeCategories = storeFilterCategories(categories)
+  const activeProductTypes = useMemo(
+    () => productTypes.filter((type) => type.active),
+    [productTypes],
+  )
 
-  const filteredProducts =
-    activeCategory === 'all' ?
-      products
-    : products.filter((product) => product.category === activeCategory)
+  const filteredProducts = products.filter((product) => {
+    if (activeCategory !== 'all' && product.category !== activeCategory) return false
+    if (activeType !== 'all' && product.productTypeId !== activeType) return false
+    return true
+  })
 
-  const activeCategoryMeta = activeCategory === 'all' ? null : getCategoryById(categories, activeCategory)
+  const activeCategoryMeta =
+    activeCategory === 'all' ? null : getCategoryById(categories, activeCategory)
+  const activeTypeMeta =
+    activeType === 'all' ? null : getProductTypeById(productTypes, activeType)
 
-  function setCategory(categoryId: string) {
-    if (categoryId === 'all') {
-      setSearchParams({})
+  const subtitle =
+    activeCategoryMeta?.description ||
+    (activeTypeMeta ? `Showing ${activeTypeMeta.name.toLowerCase()}.` : undefined)
+
+  function updateFilters(next: { category?: string; type?: string }) {
+    const params = new URLSearchParams()
+    const category = next.category ?? activeCategory
+    const type = next.type ?? activeType
+    if (category && category !== 'all') params.set('category', category)
+    if (type && type !== 'all') params.set('type', type)
+    setSearchParams(params)
+  }
+
+  function clearFilters() {
+    setSearchParams({})
+  }
+
+  function handleAdd(product: (typeof products)[number]) {
+    const productType = getProductTypeById(productTypes, product.productTypeId)
+    if (productHasConfigurableOptions(product, productType)) {
+      navigate(`/store/${product.id}`)
       return
     }
-
-    setSearchParams({ category: categoryId })
+    addItem(product)
   }
+
+  const hasActiveFilters = activeCategory !== 'all' || activeType !== 'all'
 
   return (
     <div className="page store-page notebook-page">
-      <PageHeader
-        title={activeCategoryMeta?.name ?? 'Store'}
-        subtitle={
-          activeCategoryMeta?.description ??
-          'Browse the catalog, filter by category, and add items to your cart.'
-        }
-      />
+      <PageHeader title="Shop" subtitle={subtitle} />
 
-      <div className="store-body">
-      <div className="store-filters" role="tablist" aria-label="Product categories">
-        <button
-          type="button"
-          className={`store-filter ${activeCategory === 'all' ? 'is-active' : ''}`}
-          onClick={() => setCategory('all')}
-        >
-          All <span>{products.length}</span>
-        </button>
-
-        {storeCategories.map((category) => {
-          const count = products.filter((product) => product.category === category.id).length
-
-          return (
+      <section className="store-browse" aria-label="Shop catalog">
+        <nav className="store-nav" aria-label="Shop filters">
+          <div className="store-nav-row">
             <button
-              key={category.id}
               type="button"
-              className={`store-filter ${activeCategory === category.id ? 'is-active' : ''}`}
-              onClick={() => setCategory(category.id)}
+              className={`store-nav-link ${activeCategory === 'all' ? 'is-active' : ''}`}
+              onClick={() => updateFilters({ category: 'all' })}
             >
-              {category.name} <span>{count}</span>
+              All
             </button>
-          )
-        })}
-      </div>
+            {storeCategories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                className={`store-nav-link ${activeCategory === category.id ? 'is-active' : ''}`}
+                onClick={() => updateFilters({ category: category.id })}
+              >
+                {category.name}
+              </button>
+            ))}
+            {hasActiveFilters && (
+              <button type="button" className="store-nav-clear" onClick={clearFilters}>
+                Clear
+              </button>
+            )}
+          </div>
 
-      {loading && <p className="store-status">Loading products...</p>}
-      {error && <p className="form-error">{error}</p>}
-      {!loading && !error && filteredProducts.length === 0 && (
-        <p className="store-status">
-          {activeCategory === 'all' ?
-            'No products are available yet.'
-          : `No products in ${activeCategoryMeta?.name ?? 'this category'} yet.`}
-        </p>
-      )}
+          {activeProductTypes.length > 0 && (
+            <div className="store-nav-row store-nav-row-secondary" aria-label="Collections">
+              {activeProductTypes.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  className={`store-nav-link is-quiet ${activeType === type.id ? 'is-active' : ''}`}
+                  onClick={() =>
+                    updateFilters({
+                      type: activeType === type.id ? 'all' : type.id,
+                    })
+                  }
+                >
+                  {type.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </nav>
 
-      <div className="product-grid product-grid-compact">
-        {filteredProducts.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            categoryName={getCategoryName(categories, product.category)}
-            onAdd={() => addItem(product)}
-          />
-        ))}
-      </div>
-      </div>
+        {loading && <p className="store-status">Loading products...</p>}
+        {error && <p className="form-error">{error}</p>}
+        {!loading && !error && filteredProducts.length === 0 && (
+          <p className="store-status">
+            No products match these filters.
+            {hasActiveFilters && (
+              <>
+                {' '}
+                <button type="button" className="store-status-clear" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              </>
+            )}
+          </p>
+        )}
+
+        {!loading && !error && filteredProducts.length > 0 && (
+          <div className="product-grid product-grid-compact">
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                categoryName={getCategoryName(categories, product.category)}
+                onAdd={() => handleAdd(product)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

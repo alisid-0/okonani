@@ -16,6 +16,7 @@ function toForm(settings: SiteSettings): PageForm {
     siteOffline: settings.siteOffline,
     offlineMessage: settings.offlineMessage,
     shoppingPaused: settings.shoppingPaused,
+    home: { ...settings.home, collections: [...settings.home.collections] },
   }
 }
 

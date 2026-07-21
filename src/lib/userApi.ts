@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   serverTimestamp,
@@ -89,4 +90,11 @@ export async function submitProductReview(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
+}
+
+export async function deleteOwnProductReview(productId: string, userId: string): Promise<void> {
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error('Sign in required')
+  if (auth.currentUser?.uid !== userId) throw new Error('Not allowed')
+  await deleteDoc(doc(db, 'products', productId, 'reviews', userId))
 }

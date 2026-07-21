@@ -32,7 +32,12 @@ const {
   redeemPointsForCoupon,
   pointsForAmountCents,
 } = require('./points')
-const { persistCheckoutOrder, loadProductsByStripePriceIds, loadShippingCatalog, resolveShippingAddress } = require('./orders')
+const { persistCheckoutOrder, loadProductsByStripePriceIds, loadProductsByIds, loadShippingCatalog, resolveShippingAddress } = require('./orders')
+const {
+  aggregateQuantityByProductId,
+  validateStockAvailability,
+  deductStockForCheckoutSession,
+} = require('./inventory')
 const { suggestPackaging, packagingOverride, PACKAGE_DIMS } = require('./packaging')
 const {
   buildCheckoutShippingQuote,
@@ -608,11 +613,14 @@ exports.createCheckoutSession = onRequest(
   }
 
   try {
-    const lineItems = []
+    const prepared = []
 
     for (const item of items) {
       const stripePriceId = String(item?.stripePriceId ?? '').trim()
       const quantity = parseQuantity(item?.quantity)
+      const productId = String(item?.productId ?? '').trim()
+      const productName = String(item?.productName ?? '').trim()
+      const selectedOptions = Array.isArray(item?.selectedOptions) ? item.selectedOptions : []
 
       if (!stripePriceId.startsWith('price_') || quantity == null) {
         res.status(400).json({ error: 'Invalid cart item' })
@@ -626,11 +634,59 @@ exports.createCheckoutSession = onRequest(
         return
       }
 
-      lineItems.push({
-        price: stripePriceId,
-        quantity,
-      })
+      const optionsDelta = selectedOptions.reduce(
+        (sum, option) => sum + Math.round(Number(option?.priceDeltaCents) || 0),
+        0,
+      )
+      const optionsLabel = selectedOptions
+        .map((option) => {
+          const group = String(option?.groupName || '').trim()
+          const choice = String(option?.choiceLabel || '').trim()
+          if (!group || !choice) return ''
+          return `${group}: ${choice}`
+        })
+        .filter(Boolean)
+        .join(' · ')
+
+      if (selectedOptions.length > 0 || optionsDelta !== 0) {
+        const baseAmount = typeof price.unit_amount === 'number' ? price.unit_amount : 0
+        const displayName = optionsLabel
+          ? `${productName || 'Item'} (${optionsLabel})`
+          : productName || 'Item'
+
+        prepared.push({
+          stripeLine: {
+            price_data: {
+              currency: price.currency || 'usd',
+              unit_amount: Math.max(0, baseAmount + optionsDelta),
+              tax_behavior: price.tax_behavior || 'exclusive',
+              product_data: {
+                name: displayName.slice(0, 250),
+                metadata: {
+                  productId: productId.slice(0, 500),
+                  stripePriceId,
+                  selectedOptions: JSON.stringify(selectedOptions).slice(0, 500),
+                },
+              },
+            },
+            quantity,
+          },
+          catalogPriceId: stripePriceId,
+          productId,
+        })
+      } else {
+        prepared.push({
+          stripeLine: {
+            price: stripePriceId,
+            quantity,
+          },
+          catalogPriceId: stripePriceId,
+          productId,
+        })
+      }
     }
+
+    const lineItems = prepared.map((entry) => entry.stripeLine)
 
     const clientUrl = getClientUrl(req.get('origin'))
     const decoded = await verifyOptionalAuthToken(req)
@@ -642,16 +698,44 @@ exports.createCheckoutSession = onRequest(
       metadata.firebaseUid = decoded.uid
     }
 
-    const priceIds = lineItems.map((item) => item.price)
-    const [productsByPrice, catalog] = await Promise.all([
-      loadProductsByStripePriceIds(priceIds),
+    const catalogPriceIds = prepared.map((entry) => entry.catalogPriceId)
+    const productIds = prepared.map((entry) => entry.productId).filter(Boolean)
+    const [productsByPrice, productsById, catalog] = await Promise.all([
+      loadProductsByStripePriceIds(catalogPriceIds),
+      loadProductsByIds(productIds),
       loadShippingCatalog(),
     ])
 
-    const quoteLines = lineItems.map((item) => {
-      const product = productsByPrice.get(item.price) || {}
+    for (const product of productsByPrice.values()) {
+      if (product?.id && !productsById.has(product.id)) {
+        productsById.set(product.id, product)
+      }
+    }
+
+    const stockCheck = validateStockAvailability(
+      productsById,
+      aggregateQuantityByProductId(
+        prepared.map((entry) => {
+          const fromPrice = productsByPrice.get(entry.catalogPriceId)
+          return {
+            productId: entry.productId || fromPrice?.id || '',
+            quantity: entry.stripeLine.quantity,
+          }
+        }),
+      ),
+    )
+    if (!stockCheck.ok) {
+      res.status(400).json({ error: stockCheck.error })
+      return
+    }
+
+    const quoteLines = prepared.map((entry) => {
+      const product =
+        (entry.productId && productsById.get(entry.productId)) ||
+        productsByPrice.get(entry.catalogPriceId) ||
+        {}
       return {
-        quantity: item.quantity,
+        quantity: entry.stripeLine.quantity,
         product: {
           name: product.name,
           productTypeId: product.productTypeId,
@@ -946,6 +1030,13 @@ exports.stripeWebhook = onRequest(
     try {
       const orderResult = await persistCheckoutOrder(getStripe(), session)
       console.log('Order persisted:', session.id, orderResult)
+
+      try {
+        const stockResult = await deductStockForCheckoutSession(getStripe(), session)
+        console.log('Stock deducted:', session.id, stockResult)
+      } catch (stockErr) {
+        console.error('Stock deduction error:', session.id, stockErr)
+      }
 
       if (orderResult?.isNew && orderResult.order) {
         const mailResult = await sendNewOrderAdminEmail(orderResult.order)

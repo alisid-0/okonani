@@ -28,6 +28,11 @@ import {
   type ProductType,
 } from '../data/productTypes'
 import {
+  serializeOptionGroups,
+  type ProductOptionGroup,
+  type ProductOptionsMode,
+} from '../data/productOptions'
+import {
   parseShippingType,
   DEFAULT_SHIPPING_TYPES,
   type ShippingType,
@@ -125,6 +130,10 @@ export type AdminProduct = {
   weightOz: number
   thicknessIn: number
   maxLetterQty: number
+  trackStock: boolean
+  stockQuantity: number
+  optionsMode: ProductOptionsMode
+  optionGroups: ProductOptionGroup[]
   stripeProductId: string | null
   stripePriceId: string | null
   stripeSyncedAt: string | null
@@ -171,6 +180,10 @@ function parseAdminProduct(id: string, data: Record<string, unknown>): AdminProd
     thicknessIn:
       product.thicknessIn ?? (product.shipClass === 'letter' ? 0.02 : product.shipClass === 'parcel' ? 2 : 0.5),
     maxLetterQty: product.maxLetterQty ?? (product.shipClass === 'letter' ? 10 : 0),
+    trackStock: product.trackStock === true,
+    stockQuantity: typeof product.stockQuantity === 'number' ? product.stockQuantity : 0,
+    optionsMode: product.optionsMode ?? 'inherit',
+    optionGroups: product.optionGroups ?? [],
     stripeProductId: typeof data.stripeProductId === 'string' ? data.stripeProductId : null,
     stripePriceId: typeof data.stripePriceId === 'string' ? data.stripePriceId : null,
     stripeSyncedAt: typeof data.stripeSyncedAt === 'string' ? data.stripeSyncedAt : null,
@@ -329,6 +342,10 @@ export async function saveAdminProduct(input: {
   weightOz: number
   thicknessIn: number
   maxLetterQty: number
+  trackStock?: boolean
+  stockQuantity?: number
+  optionsMode?: ProductOptionsMode
+  optionGroups?: ProductOptionGroup[]
 }): Promise<{ product: AdminProduct }> {
   await ensureAdminFirestoreAccess()
 
@@ -378,6 +395,13 @@ export async function saveAdminProduct(input: {
     weightOz: Math.max(0.01, Number(input.weightOz) || 0.1),
     thicknessIn: Math.max(0, Number(input.thicknessIn) || 0),
     maxLetterQty: Math.max(0, Math.round(Number(input.maxLetterQty) || 0)),
+    trackStock: input.trackStock === true,
+    stockQuantity: Math.max(0, Math.floor(Number(input.stockQuantity) || 0)),
+    optionsMode: input.optionsMode ?? 'inherit',
+    optionGroups:
+      (input.optionsMode ?? 'inherit') === 'custom'
+        ? serializeOptionGroups(input.optionGroups ?? [])
+        : [],
     isDeleted: false,
     stripeProductId: stripeFields.stripeProductId ?? existing?.stripeProductId ?? null,
     stripePriceId: stripeFields.stripePriceId ?? existing?.stripePriceId ?? null,
@@ -596,6 +620,7 @@ export async function saveAdminProductType(input: ProductType): Promise<ProductT
     shippingTypeId: input.shippingTypeId.trim(),
     shipsAsLetter: input.shipsAsLetter === true,
     maxLetterQty: Math.max(0, Math.round(input.maxLetterQty)),
+    optionGroups: serializeOptionGroups(input.optionGroups ?? []),
     sortOrder,
     active: input.active !== false,
     updatedAt: serverTimestamp(),
@@ -692,6 +717,14 @@ export async function deleteAdminContactMessage(id: string): Promise<void> {
   await deleteDoc(doc(db, 'contactMessages', id))
 }
 
+export async function deleteAdminProductReview(
+  productId: string,
+  reviewUserId: string,
+): Promise<void> {
+  await ensureAdminFirestoreAccess()
+  await deleteDoc(doc(db, 'products', productId, 'reviews', reviewUserId))
+}
+
 export async function getSiteSettings(): Promise<SiteSettings> {
   await ensureAdminFirestoreAccess()
   const snapshot = await getDoc(doc(db, SITE_SETTINGS_DOC))
@@ -702,6 +735,7 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
   await ensureAdminFirestoreAccess()
 
   const offlineMessage = settings.offlineMessage.trim() || DEFAULT_SITE_SETTINGS.offlineMessage
+  const home = settings.home ?? DEFAULT_SITE_SETTINGS.home
 
   await setDoc(
     doc(db, SITE_SETTINGS_DOC),
@@ -710,6 +744,19 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
       siteOffline: settings.siteOffline,
       offlineMessage,
       shoppingPaused: settings.shoppingPaused === true,
+      home: {
+        collectionsEnabled: home.collectionsEnabled === true,
+        collectionsTitle: home.collectionsTitle.trim() || DEFAULT_SITE_SETTINGS.home.collectionsTitle,
+        collectionsLead: home.collectionsLead.trim(),
+        collections: (home.collections ?? [])
+          .filter((item) => item.productTypeId.trim())
+          .map((item, index) => ({
+            productTypeId: item.productTypeId.trim(),
+            label: item.label.trim(),
+            imageUrl: item.imageUrl.trim(),
+            sortOrder: typeof item.sortOrder === 'number' ? item.sortOrder : index,
+          })),
+      },
       updatedAt: serverTimestamp(),
     },
     { merge: true },
@@ -727,6 +774,11 @@ export type AdminOrderItem = {
   weightOz: number | null
   thicknessIn: number | null
   maxLetterQty: number | null
+  selectedOptions: Array<{
+    groupName: string
+    choiceLabel: string
+    priceDeltaCents?: number
+  }>
 }
 
 export type AdminOrderAddress = {
@@ -787,6 +839,24 @@ function parseOrderAddress(data: unknown): AdminOrderAddress | null {
   }
 }
 
+function parseOrderSelectedOptions(
+  value: unknown,
+): Array<{ groupName: string; choiceLabel: string; priceDeltaCents?: number }> {
+  if (!Array.isArray(value)) return []
+  const options: Array<{ groupName: string; choiceLabel: string; priceDeltaCents?: number }> = []
+  for (const option of value) {
+    if (!option || typeof option !== 'object') continue
+    const opt = option as Record<string, unknown>
+    if (typeof opt.groupName !== 'string' || typeof opt.choiceLabel !== 'string') continue
+    options.push({
+      groupName: opt.groupName,
+      choiceLabel: opt.choiceLabel,
+      ...(typeof opt.priceDeltaCents === 'number' ? { priceDeltaCents: opt.priceDeltaCents } : {}),
+    })
+  }
+  return options
+}
+
 function parseAdminOrder(id: string, data: Record<string, unknown>): AdminOrder | null {
   const itemsRaw = Array.isArray(data.items) ? data.items : []
   const items: AdminOrderItem[] = itemsRaw
@@ -805,6 +875,7 @@ function parseAdminOrder(id: string, data: Record<string, unknown>): AdminOrder 
         weightOz: typeof record.weightOz === 'number' ? record.weightOz : null,
         thicknessIn: typeof record.thicknessIn === 'number' ? record.thicknessIn : null,
         maxLetterQty: typeof record.maxLetterQty === 'number' ? record.maxLetterQty : null,
+        selectedOptions: parseOrderSelectedOptions(record.selectedOptions),
       } satisfies AdminOrderItem
     })
     .filter((item): item is AdminOrderItem => item !== null)

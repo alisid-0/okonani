@@ -1,6 +1,15 @@
 type CheckoutItem = {
   stripePriceId: string
   quantity: number
+  productId?: string
+  productName?: string
+  selectedOptions?: Array<{
+    groupId: string
+    groupName: string
+    choiceId: string
+    choiceLabel: string
+    priceDeltaCents: number
+  }>
 }
 
 type CheckoutOptions = {

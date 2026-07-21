@@ -1,6 +1,5 @@
 import { type FormEvent, useState } from 'react'
 import PageHeader from '../components/PageHeader'
-import PageSheet from '../components/PageSheet'
 import { submitContactMessage } from '../lib/userApi'
 
 export default function Contact() {
@@ -32,9 +31,17 @@ export default function Contact() {
 
   return (
     <div className="page page-narrow page-contact notebook-page">
-      <PageHeader title="Contact" subtitle="Questions, custom orders, or just saying hi! I'd love to hear from you." />
+      <PageHeader
+        title="Contact"
+        subtitle="Questions, custom orders, or just saying hi! I'd love to hear from you."
+      />
 
-      <PageSheet>
+      <div className="content-card contact-card">
+        <div className="content-card-header">
+          <h2>Send a message</h2>
+          <p>I read every note and usually reply within a few days.</p>
+        </div>
+
         {success && <p className="form-success">Message sent. We'll get back to you soon.</p>}
 
         <form className="contact-form" onSubmit={handleSubmit}>
@@ -78,7 +85,7 @@ export default function Contact() {
             {sending ? 'Sending…' : 'Send message'}
           </button>
         </form>
-      </PageSheet>
+      </div>
     </div>
   )
 }

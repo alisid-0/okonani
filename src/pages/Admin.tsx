@@ -17,10 +17,13 @@ import {
 import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
 import ImageCropModal from '../components/ImageCropModal'
+import ProductOptionsEditorModal from '../components/ProductOptionsEditorModal'
 import SortableList from '../components/SortableList'
 import type { ProductType } from '../data/productTypes'
+import type { ProductOptionGroup, ProductOptionsMode } from '../data/productOptions'
 import type { ShippingType } from '../data/shippingTypes'
 import AdminCategories from './AdminCategories'
+import AdminHome from './AdminHome'
 import AdminMessages from './AdminMessages'
 import AdminOrders from './AdminOrders'
 import AdminPages from './AdminPages'
@@ -33,6 +36,7 @@ type AdminPanel =
   | 'categories'
   | 'messages'
   | 'pages'
+  | 'home'
   | 'orders'
   | 'productTypes'
   | 'shippingTypes'
@@ -55,6 +59,10 @@ type ProductForm = {
   weightOz: string
   thicknessIn: string
   maxLetterQty: string
+  trackStock: boolean
+  stockQuantity: string
+  optionsMode: ProductOptionsMode
+  optionGroups: ProductOptionGroup[]
 }
 
 const emptyForm = (): ProductForm => ({
@@ -71,6 +79,10 @@ const emptyForm = (): ProductForm => ({
   weightOz: '1',
   thicknessIn: '0.5',
   maxLetterQty: '0',
+  trackStock: false,
+  stockQuantity: '0',
+  optionsMode: 'inherit',
+  optionGroups: [],
 })
 
 function dollarsToCents(value: string): number {
@@ -100,6 +112,7 @@ export default function Admin() {
       fromUrl === 'categories' ||
       fromUrl === 'messages' ||
       fromUrl === 'pages' ||
+      fromUrl === 'home' ||
       fromUrl === 'products'
     ) {
       return fromUrl
@@ -133,6 +146,7 @@ export default function Admin() {
   const [batchBusy, setBatchBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [optionsOpen, setOptionsOpen] = useState(false)
   const draftProductIdRef = useRef('')
 
   async function loadProducts(selectId?: string) {
@@ -195,6 +209,10 @@ export default function Admin() {
       weightOz: String(product.weightOz),
       thicknessIn: String(product.thicknessIn),
       maxLetterQty: String(product.maxLetterQty),
+      trackStock: product.trackStock === true,
+      stockQuantity: String(product.stockQuantity ?? 0),
+      optionsMode: product.optionsMode ?? 'inherit',
+      optionGroups: product.optionGroups ?? [],
     })
   }
 
@@ -272,6 +290,10 @@ export default function Admin() {
         weightOz: Number.parseFloat(form.weightOz) || 0.1,
         thicknessIn: Number.parseFloat(form.thicknessIn) || 0,
         maxLetterQty: Number.parseInt(form.maxLetterQty, 10) || 0,
+        trackStock: form.trackStock,
+        stockQuantity: Number.parseInt(form.stockQuantity, 10) || 0,
+        optionsMode: form.optionsMode,
+        optionGroups: form.optionGroups,
       })
       setMessage(`Saved "${data.product.name}" and synced to Stripe.`)
       await loadProducts(data.product.id)
@@ -556,13 +578,22 @@ export default function Admin() {
           onConfirm={handleCropConfirm}
         />
       )}
+      <ProductOptionsEditorModal
+        open={optionsOpen}
+        title={form.name ? `Options for ${form.name}` : 'Product options'}
+        groups={form.optionGroups}
+        uploadKey={`_option-images/products/${form.id || 'new'}`}
+        onClose={() => setOptionsOpen(false)}
+        onSave={(optionGroups) => setForm((prev) => ({ ...prev, optionGroups }))}
+      />
       <aside className="admin-sidebar">
         <div className="admin-sidebar-top">
           <p className="admin-brand">Okonani</p>
-          <p className="admin-brand-sub">Product studio</p>
+          <p className="admin-brand-sub">Admin</p>
         </div>
 
-        <div className="admin-sidebar-nav">
+        <nav className="admin-sidebar-nav" aria-label="Admin sections">
+          <p className="admin-sidebar-group-label">Catalog</p>
           <button
             type="button"
             className={`admin-sidebar-nav-btn ${panel === 'products' ? 'is-active' : ''}`}
@@ -576,10 +607,10 @@ export default function Admin() {
           </button>
           <button
             type="button"
-            className={`admin-sidebar-nav-btn ${panel === 'orders' ? 'is-active' : ''}`}
-            onClick={() => selectPanel('orders')}
+            className={`admin-sidebar-nav-btn ${panel === 'categories' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('categories')}
           >
-            Orders
+            Categories
           </button>
           <button
             type="button"
@@ -588,6 +619,15 @@ export default function Admin() {
           >
             Product types
           </button>
+
+          <p className="admin-sidebar-group-label">Fulfillment</p>
+          <button
+            type="button"
+            className={`admin-sidebar-nav-btn ${panel === 'orders' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('orders')}
+          >
+            Orders
+          </button>
           <button
             type="button"
             className={`admin-sidebar-nav-btn ${panel === 'shippingTypes' ? 'is-active' : ''}`}
@@ -595,19 +635,14 @@ export default function Admin() {
           >
             Shipping
           </button>
+
+          <p className="admin-sidebar-group-label">Site</p>
           <button
             type="button"
-            className={`admin-sidebar-nav-btn ${panel === 'categories' ? 'is-active' : ''}`}
-            onClick={() => selectPanel('categories')}
+            className={`admin-sidebar-nav-btn ${panel === 'home' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('home')}
           >
-            Categories
-          </button>
-          <button
-            type="button"
-            className={`admin-sidebar-nav-btn ${panel === 'messages' ? 'is-active' : ''}`}
-            onClick={() => selectPanel('messages')}
-          >
-            Messages
+            Home
           </button>
           <button
             type="button"
@@ -616,7 +651,14 @@ export default function Admin() {
           >
             Pages
           </button>
-        </div>
+          <button
+            type="button"
+            className={`admin-sidebar-nav-btn ${panel === 'messages' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('messages')}
+          >
+            Messages
+          </button>
+        </nav>
 
         <div className="admin-sidebar-fill" aria-hidden="true" />
 
@@ -639,6 +681,8 @@ export default function Admin() {
           <AdminShippingTypes />
         : panel === 'categories' ?
           <AdminCategories />
+        : panel === 'home' ?
+          <AdminHome />
         : panel === 'messages' ?
           <AdminMessages />
         : panel === 'pages' ?
@@ -793,6 +837,9 @@ export default function Admin() {
                           </span>
                           <span className="admin-products-row-meta">
                             <span>{formatPrice(product.priceInCents)}</span>
+                            {product.trackStock ?
+                              <span>{product.stockQuantity} in stock</span>
+                            : null}
                             <span className={`admin-products-status ${product.active ? 'is-live' : 'is-hidden'}`}>
                               {product.active ? 'Live' : 'Hidden'}
                             </span>
@@ -947,6 +994,130 @@ export default function Admin() {
                     <small>Inactive products stay in admin but hide from shoppers.</small>
                   </span>
                 </label>
+
+                <div className="admin-options-section">
+                  <h2>Inventory</h2>
+                  <p className="admin-field-hint">
+                    Optional. Leave stock tracking off for unlimited items. When enabled, checkout
+                    blocks overselling and stock is deducted after a paid order.
+                  </p>
+                  <label className="admin-toggle">
+                    <input
+                      type="checkbox"
+                      checked={form.trackStock}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, trackStock: e.target.checked }))
+                      }
+                    />
+                    <span>
+                      <strong>Track stock</strong>
+                      <small>Limit how many of this product can be purchased.</small>
+                    </span>
+                  </label>
+                  {form.trackStock && (
+                    <label>
+                      Quantity in stock
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={form.stockQuantity}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, stockQuantity: e.target.value }))
+                        }
+                      />
+                    </label>
+                  )}
+                </div>
+
+                <div className="admin-options-section">
+                  <h2>Options</h2>
+                  <p className="admin-field-hint">
+                    Inherit option types from the product type, customize for this product, or turn
+                    options off. Edit choices and images in the options popup.
+                  </p>
+                  <label>
+                    Options source
+                    <select
+                      value={form.optionsMode}
+                      onChange={(e) => {
+                        const optionsMode = e.target.value as ProductOptionsMode
+                        setForm((prev) => {
+                          if (optionsMode === 'custom' && prev.optionGroups.length === 0) {
+                            const typeGroups =
+                              productTypes.find((type) => type.id === prev.productTypeId)
+                                ?.optionGroups ?? []
+                            return {
+                              ...prev,
+                              optionsMode,
+                              optionGroups: typeGroups.map((group) => ({
+                                ...group,
+                                choices: group.choices.map((choice) => ({ ...choice })),
+                              })),
+                            }
+                          }
+                          return { ...prev, optionsMode }
+                        })
+                      }}
+                    >
+                      <option value="inherit">Inherit from product type</option>
+                      <option value="custom">Custom for this product</option>
+                      <option value="none">No options</option>
+                    </select>
+                  </label>
+
+                  {form.optionsMode === 'inherit' && (
+                    <div className="admin-options-preview">
+                      {(productTypes.find((type) => type.id === form.productTypeId)?.optionGroups
+                        ?.length ?? 0) === 0 ?
+                        <p className="admin-field-hint">
+                          This product type has no option types yet. Add them under Product types.
+                        </p>
+                      : (
+                        <ul className="admin-options-preview-list">
+                          {(
+                            productTypes.find((type) => type.id === form.productTypeId)
+                              ?.optionGroups ?? []
+                          ).map((group) => (
+                            <li key={group.id}>
+                              <strong>{group.name}</strong>
+                              {group.required ? ' (required)' : ' (optional)'}:{' '}
+                              {group.choices.map((choice) => choice.label).join(', ')}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  {form.optionsMode === 'custom' && (
+                    <>
+                      {form.optionGroups.filter((group) => group.name.trim()).length > 0 ?
+                        <ul className="admin-options-preview-list">
+                          {form.optionGroups
+                            .filter((group) => group.name.trim())
+                            .map((group) => (
+                              <li key={group.id}>
+                                <strong>{group.name}</strong>
+                                {group.required ? ' (required)' : ' (optional)'}:{' '}
+                                {group.choices.map((choice) => choice.label).filter(Boolean).join(', ') ||
+                                  'no choices yet'}
+                              </li>
+                            ))}
+                        </ul>
+                      : (
+                        <p className="admin-field-hint">No custom options yet.</p>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setOptionsOpen(true)}
+                      >
+                        Edit options
+                      </button>
+                    </>
+                  )}
+                </div>
 
                 {form.id && (
                   <div className="admin-meta-block">

@@ -1,4 +1,4 @@
-const { quoteShipping, decidePackaging, DEFAULT_LETTER_SETTINGS } = require('./shippingQuote')
+const { quoteShipping, decidePackaging, DEFAULT_LETTER_SETTINGS, bubbleMailerWeightOz, totalItemsWeightOz } = require('./shippingQuote')
 const { createShipmentRates, validateAddress } = require('./shippo')
 const { PACKAGE_DIMS } = require('./packaging')
 
@@ -141,7 +141,12 @@ async function buildCheckoutShippingQuote({
     letterSettings: settings,
   })
 
-  // Always quote bubble mailer via Shippo for the Bubble mailer option.
+  // Always quote bubble mailer via Shippo using summed item weights (+ mailer tare).
+  const itemsWeightOz =
+    typeof letterEligiblePackaging.itemsWeightOz === 'number'
+      ? letterEligiblePackaging.itemsWeightOz
+      : totalItemsWeightOz(quoteLines)
+
   const mailerPackaging = {
     packageType: 'bubble_mailer',
     postageMode: 'label',
@@ -149,7 +154,8 @@ async function buildCheckoutShippingQuote({
       ? 'Optional tracked bubble mailer (Shippo).'
       : localQuote.reason,
     dims: PACKAGE_DIMS.bubble_mailer,
-    weightOz: Math.max(1, letterEligiblePackaging.weightOz || 1),
+    weightOz: bubbleMailerWeightOz(itemsWeightOz),
+    itemsWeightOz,
     shipClasses: letterEligiblePackaging.shipClasses || [],
   }
 

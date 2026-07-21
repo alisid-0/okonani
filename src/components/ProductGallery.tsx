@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ProductMedia } from '../data/products'
+import ProtectedImage from './ProtectedImage'
 
 type ProductGalleryProps = {
   media: ProductMedia[]
@@ -48,10 +49,10 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
   }
 
   return (
-    <div className="product-gallery">
+    <div className="product-gallery" onContextMenu={(event) => event.preventDefault()}>
       <div className="product-gallery-stage">
         {activeItem.type === 'image' && (
-          <img
+          <ProtectedImage
             src={activeItem.url}
             alt={activeItem.alt || productName}
             className="product-gallery-image"
@@ -71,7 +72,12 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
         )}
 
         {activeItem.type === 'video' && (!isYoutubeUrl(activeItem.url) || !youtubeEmbedUrl(activeItem.url)) && (
-          <video controls className="product-gallery-video" src={activeItem.url}>
+          <video
+            controls
+            className="product-gallery-video"
+            src={activeItem.url}
+            controlsList="nodownload"
+          >
             <track kind="captions" />
           </video>
         )}
@@ -114,7 +120,7 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
               aria-label={`Show media ${index + 1}`}
             >
               {item.type === 'image' ?
-                <img src={item.url} alt="" loading="lazy" decoding="async" />
+                <ProtectedImage src={item.url} alt="" loading="lazy" decoding="async" />
               : <span className="product-gallery-thumb-video">▶</span>}
             </button>
           ))}

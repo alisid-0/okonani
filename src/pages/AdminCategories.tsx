@@ -209,38 +209,12 @@ export default function AdminCategories() {
           <label className="admin-toggle">
             <input
               type="checkbox"
-              checked={form.showOnHome}
-              onChange={(e) => setForm((prev) => ({ ...prev, showOnHome: e.target.checked }))}
-            />
-            <span>
-              <strong>Show product row on home page</strong>
-            </span>
-          </label>
-
-          {form.showOnHome && (
-            <label>
-              Products to show on home
-              <input
-                type="number"
-                min={1}
-                max={24}
-                value={form.homeProductLimit}
-                onChange={(e) => setForm((prev) => ({ ...prev, homeProductLimit: e.target.value }))}
-              />
-              <span className="admin-field-hint">
-                Top products by sort order in this category
-              </span>
-            </label>
-          )}
-
-          <label className="admin-toggle">
-            <input
-              type="checkbox"
               checked={form.showInStore}
               onChange={(e) => setForm((prev) => ({ ...prev, showInStore: e.target.checked }))}
             />
             <span>
               <strong>Show in store filters</strong>
+              <small>Home page rows are configured under Home.</small>
             </span>
           </label>
 
@@ -262,7 +236,9 @@ export default function AdminCategories() {
 
         <div className="admin-card">
           <h2>All categories</h2>
-          <p className="admin-field-hint">Drag ⠿ to set home page and store filter order.</p>
+          <p className="admin-field-hint">
+            Drag ⠿ to set store filter order. Home page category rows are managed under Home.
+          </p>
           {loading && <p>Loading…</p>}
           {!loading && categories.length === 0 && (
             <p className="admin-empty-copy">No categories yet. Create New arrivals and Best sellers to get started.</p>
@@ -280,8 +256,8 @@ export default function AdminCategories() {
                   <div>
                     <strong>{category.name}</strong>
                     <p className="admin-meta">
-                      {category.id} · home {category.showOnHome ? `${category.homeProductLimit} products` : 'off'} · store{' '}
-                      {category.showInStore ? 'on' : 'off'}
+                      {category.id} · store {category.showInStore ? 'on' : 'off'}
+                      {category.showOnHome ? ` · home (${category.homeProductLimit})` : ''}
                     </p>
                   </div>
                   <div className="admin-item-actions">
