@@ -13,6 +13,12 @@ const {
   getStorageBucketName,
   getStripeSecretKey,
   getStripeWebhookSecret,
+  shippoApiTokenSecret,
+  shipFromJsonSecret,
+  resendApiKeySecret,
+  mailFromSecret,
+  orderNotifyEmailSecret,
+  clientUrlSecret,
 } = require('./env')
 const { syncProductToStripe } = require('./stripeSync')
 const {
@@ -26,7 +32,21 @@ const {
   redeemPointsForCoupon,
   pointsForAmountCents,
 } = require('./points')
+const { persistCheckoutOrder, loadProductsByStripePriceIds, loadShippingCatalog, resolveShippingAddress } = require('./orders')
+const { suggestPackaging, packagingOverride, PACKAGE_DIMS } = require('./packaging')
+const {
+  buildCheckoutShippingQuote,
+  dummyStripeShippingOption,
+  letterSettingsFromCatalog,
+  parseDestinationAddress,
+  ratesToStripeShippingOptions,
+  toStripeCollectedShippingDetails,
+} = require('./checkoutShipping')
+const { decidePackaging } = require('./shippingQuote')
+const { createShipmentRates, purchaseLabel, registerTracking, normalizeTrackingStatus } = require('./shippo')
+const { sendShippingConfirmationEmail, sendDeliveredEmail, sendNewOrderAdminEmail } = require('./mail')
 const { getSocialFeeds } = require('./socialFeeds')
+const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 
 if (!getApps().length) {
   initializeApp({
@@ -441,7 +461,135 @@ exports.adminReadMedia = onRequest(
   },
 )
 
-exports.createCheckoutSession = onRequest({ region, cors: true, invoker: 'public', secrets: [stripeSecretKey] }, async (req, res) => {
+exports.quoteCheckoutShipping = onRequest(
+  {
+    region,
+    cors: true,
+    invoker: 'public',
+    secrets: [stripeSecretKey, shippoApiTokenSecret, shipFromJsonSecret],
+    timeoutSeconds: 60,
+  },
+  async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res, 'POST')
+      return
+    }
+
+    const items = req.body?.items
+    if (!Array.isArray(items) || items.length === 0 || items.length > 20) {
+      res.status(400).json({ error: 'Cart is empty or too large' })
+      return
+    }
+
+    const destination = parseDestinationAddress(req.body?.address)
+    if (!destination) {
+      res.status(400).json({ error: 'Enter a complete US shipping address (street, city, state, ZIP).' })
+      return
+    }
+
+    try {
+      const lineItems = []
+      let subtotalCents = 0
+
+      for (const item of items) {
+        const stripePriceId = String(item?.stripePriceId ?? '').trim()
+        const quantity = parseQuantity(item?.quantity)
+        if (!stripePriceId.startsWith('price_') || quantity == null) {
+          res.status(400).json({ error: 'Invalid cart item' })
+          return
+        }
+
+        const price = await getStripe().prices.retrieve(stripePriceId)
+        if (!price.active) {
+          res.status(400).json({ error: 'Invalid cart item' })
+          return
+        }
+
+        if (typeof price.unit_amount === 'number') {
+          subtotalCents += price.unit_amount * quantity
+        }
+
+        lineItems.push({ price: stripePriceId, quantity })
+      }
+
+      const [productsByPrice, catalog] = await Promise.all([
+        loadProductsByStripePriceIds(lineItems.map((item) => item.price)),
+        loadShippingCatalog(),
+      ])
+
+      const quoteLines = lineItems.map((item) => {
+        const product = productsByPrice.get(item.price) || {}
+        return {
+          quantity: item.quantity,
+          product: {
+            name: product.name,
+            productTypeId: product.productTypeId,
+            shipClass: product.shipClass,
+            weightOz: product.weightOz,
+            thicknessIn: product.thicknessIn,
+            maxLetterQty: product.maxLetterQty,
+          },
+        }
+      })
+
+      const quote = await buildCheckoutShippingQuote({
+        quoteLines,
+        productTypes: catalog.productTypes,
+        shippingTypes: catalog.shippingTypes,
+        destination,
+      })
+
+      res.json({
+        mode: quote.mode,
+        message: quote.message,
+        packaging: {
+          packageType: quote.packaging.packageType,
+          postageMode: quote.packaging.postageMode,
+          weightOz: quote.packaging.weightOz,
+          reason: quote.packaging.reason,
+        },
+        recommendedRateId: quote.recommendedRateId,
+        rates: quote.rates,
+        subtotalCents,
+        addressValidation: quote.addressValidation
+          ? {
+              isValid: quote.addressValidation.isValid,
+              messages: quote.addressValidation.messages || [],
+            }
+          : null,
+        validatedAddress: quote.validatedAddress || destination,
+      })
+    } catch (err) {
+      console.error('Checkout shipping quote error:', err)
+      if (err.code === 'address_invalid' && err.addressValidation) {
+        res.status(400).json({
+          error: err.message,
+          addressValidation: {
+            isValid: false,
+            messages: err.addressValidation.messages || [err.message],
+          },
+        })
+        return
+      }
+      sendHttpError(res, err)
+    }
+  },
+)
+
+exports.createCheckoutSession = onRequest(
+  {
+    region,
+    cors: true,
+    invoker: 'public',
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 60,
+  },
+  async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.status(204).send('')
     return
@@ -494,12 +642,59 @@ exports.createCheckoutSession = onRequest({ region, cors: true, invoker: 'public
       metadata.firebaseUid = decoded.uid
     }
 
+    const priceIds = lineItems.map((item) => item.price)
+    const [productsByPrice, catalog] = await Promise.all([
+      loadProductsByStripePriceIds(priceIds),
+      loadShippingCatalog(),
+    ])
+
+    const quoteLines = lineItems.map((item) => {
+      const product = productsByPrice.get(item.price) || {}
+      return {
+        quantity: item.quantity,
+        product: {
+          name: product.name,
+          productTypeId: product.productTypeId,
+          shipClass: product.shipClass,
+          weightOz: product.weightOz,
+          thicknessIn: product.thicknessIn,
+          maxLetterQty: product.maxLetterQty,
+        },
+      }
+    })
+
+    const letterSettings = letterSettingsFromCatalog(catalog.shippingTypes)
+    const packaging = decidePackaging(
+      quoteLines,
+      catalog.productTypes,
+      letterSettings.letterMaxItems,
+    )
+    metadata.packageType = packaging.packageType
+    metadata.letterAvailable =
+      packaging.packageType === 'envelope' && packaging.postageMode === 'stamp' ? 'true' : 'false'
+
     const sessionParams = {
       mode: 'payment',
+      ui_mode: 'embedded_page',
+      return_url: `${clientUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       line_items: lineItems,
-      success_url: `${clientUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${clientUrl}/checkout/cancel`,
       metadata,
+      automatic_tax: {
+        enabled: true,
+      },
+      // Collect enough address info for Stripe Tax even before shipping is confirmed.
+      billing_address_collection: 'auto',
+      permissions: {
+        update_shipping_details: 'server_only',
+      },
+      shipping_address_collection: {
+        allowed_countries: ['US'],
+      },
+      phone_number_collection: {
+        enabled: true,
+      },
+      // Replaced with Shippo (and letter) rates after the customer enters their address.
+      shipping_options: [dummyStripeShippingOption()],
     }
 
     const promotionCode =
@@ -527,12 +722,145 @@ exports.createCheckoutSession = onRequest({ region, cors: true, invoker: 'public
 
     const session = await getStripe().checkout.sessions.create(sessionParams)
 
-    res.json({ url: session.url })
+    if (!session.client_secret) {
+      res.status(500).json({ error: 'Checkout session missing client secret' })
+      return
+    }
+
+    res.json({ clientSecret: session.client_secret, sessionId: session.id })
   } catch (err) {
     console.error('Checkout session error:', err)
     sendHttpError(res, err)
   }
 })
+
+/**
+ * Embedded Checkout: after address entry, quote Shippo (+ letter if eligible) and update the session.
+ */
+exports.updateCheckoutShipping = onRequest(
+  {
+    region,
+    cors: true,
+    invoker: 'public',
+    secrets: [stripeSecretKey, shippoApiTokenSecret, shipFromJsonSecret],
+    timeoutSeconds: 60,
+  },
+  async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res, 'POST')
+      return
+    }
+
+    try {
+      const checkoutSessionId = String(
+        req.body?.checkout_session_id || req.body?.checkoutSessionId || '',
+      ).trim()
+      const shippingDetails = req.body?.shipping_details || req.body?.shippingDetails
+
+      if (!checkoutSessionId.startsWith('cs_')) {
+        res.status(400).json({ type: 'error', message: 'Missing checkout session id.' })
+        return
+      }
+
+      const destination = parseDestinationAddress(shippingDetails)
+      if (!destination) {
+        res.status(400).json({
+          type: 'error',
+          message: 'Enter a complete US shipping address (street, city, state, ZIP).',
+        })
+        return
+      }
+
+      const session = await getStripe().checkout.sessions.retrieve(checkoutSessionId, {
+        expand: ['line_items.data.price'],
+      })
+      if (session.status !== 'open') {
+        res.status(400).json({ type: 'error', message: 'This checkout session is no longer open.' })
+        return
+      }
+
+      const lineItems = session.line_items?.data || []
+      if (lineItems.length === 0) {
+        res.status(400).json({ type: 'error', message: 'Could not load cart items for shipping.' })
+        return
+      }
+
+      const priceIds = lineItems
+        .map((item) => {
+          const price = item.price
+          return typeof price === 'string' ? price : price?.id
+        })
+        .filter(Boolean)
+
+      const [productsByPrice, catalog] = await Promise.all([
+        loadProductsByStripePriceIds(priceIds),
+        loadShippingCatalog(),
+      ])
+
+      const quoteLines = lineItems.map((item) => {
+        const priceId = typeof item.price === 'string' ? item.price : item.price?.id
+        const product = productsByPrice.get(priceId) || {}
+        return {
+          quantity: item.quantity || 1,
+          product: {
+            name: product.name,
+            productTypeId: product.productTypeId,
+            shipClass: product.shipClass,
+            weightOz: product.weightOz,
+            thicknessIn: product.thicknessIn,
+            maxLetterQty: product.maxLetterQty,
+          },
+        }
+      })
+
+      const quote = await buildCheckoutShippingQuote({
+        quoteLines,
+        productTypes: catalog.productTypes,
+        shippingTypes: catalog.shippingTypes,
+        destination,
+      })
+
+      const shippingOptions = ratesToStripeShippingOptions(quote.rates)
+      if (shippingOptions.length === 0) {
+        res.status(400).json({
+          type: 'error',
+          message: 'No shipping options available for that address. Try a different address.',
+        })
+        return
+      }
+
+      await getStripe().checkout.sessions.update(checkoutSessionId, {
+        collected_information: {
+          shipping_details: toStripeCollectedShippingDetails(shippingDetails, destination),
+        },
+        shipping_options: shippingOptions,
+        metadata: {
+          ...session.metadata,
+          letterAvailable: quote.letterAvailable ? 'true' : 'false',
+          shippoShipmentId: quote.shipmentId || '',
+        },
+      })
+
+      res.json({ type: 'object', value: { succeeded: true } })
+    } catch (err) {
+      console.error('Update checkout shipping error:', err)
+      const message =
+        err.code === 'address_invalid'
+          ? err.message
+          : err.message || 'Could not calculate shipping for that address.'
+      res.status(err.status && err.status < 500 ? err.status : 500).json({
+        type: 'error',
+        message,
+      })
+    }
+  },
+)
+
 
 exports.getCheckoutSession = onRequest({ region, cors: true, invoker: 'public', secrets: [stripeSecretKey] }, async (req, res) => {
   if (req.method === 'OPTIONS') {
@@ -569,7 +897,21 @@ exports.getCheckoutSession = onRequest({ region, cors: true, invoker: 'public', 
   }
 })
 
-exports.stripeWebhook = onRequest({ region, invoker: 'public', secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
+exports.stripeWebhook = onRequest(
+  {
+    region,
+    invoker: 'public',
+    secrets: [
+      stripeSecretKey,
+      stripeWebhookSecret,
+      resendApiKeySecret,
+      mailFromSecret,
+      orderNotifyEmailSecret,
+      clientUrlSecret,
+      adminEmailsSecret,
+    ],
+  },
+  async (req, res) => {
   if (req.method !== 'POST') {
     sendMethodNotAllowed(res, 'POST')
     return
@@ -600,6 +942,18 @@ exports.stripeWebhook = onRequest({ region, invoker: 'public', secrets: [stripeS
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object
+
+    try {
+      const orderResult = await persistCheckoutOrder(getStripe(), session)
+      console.log('Order persisted:', session.id, orderResult)
+
+      if (orderResult?.isNew && orderResult.order) {
+        const mailResult = await sendNewOrderAdminEmail(orderResult.order)
+        console.log('New order admin email:', session.id, mailResult)
+      }
+    } catch (err) {
+      console.error('Order persist error:', session.id, err)
+    }
 
     try {
       const result = await awardPointsForCheckoutSession(getStripe(), session)
@@ -687,3 +1041,416 @@ exports.getSocialFeeds = onRequest({ ...httpOptions }, async (req, res) => {
     sendHttpError(res, err)
   }
 })
+
+function serializeAdminTimestamp(value) {
+  if (value && typeof value.toDate === 'function') {
+    return value.toDate().toISOString()
+  }
+  return typeof value === 'string' ? value : null
+}
+
+exports.adminListOrders = onRequest(
+  { ...httpOptions, secrets: [adminEmailsSecret, stripeSecretKey] },
+  async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('')
+    return
+  }
+
+  if (req.method !== 'GET') {
+    sendMethodNotAllowed(res, 'GET')
+    return
+  }
+
+  try {
+    await requireAdminRequest(req)
+
+    const snapshot = await getFirestore().collection('orders').orderBy('createdAt', 'desc').get()
+
+    const orders = await Promise.all(
+      snapshot.docs.map(async (docSnap) => {
+        let data = docSnap.data()
+
+        // Backfill addresses saved before we read collected_information.shipping_details
+        if (!data.shippingAddress?.line1 && String(docSnap.id).startsWith('cs_')) {
+          try {
+            const session = await getStripe().checkout.sessions.retrieve(docSnap.id)
+            const shipping = resolveShippingAddress(session)
+            if (shipping?.line1) {
+              const patch = {
+                shippingAddress: shipping,
+                customerName: shipping.name || data.customerName || '',
+                updatedAt: FieldValue.serverTimestamp(),
+              }
+              if (!data.phone && session.customer_details?.phone) {
+                patch.phone = session.customer_details.phone
+              }
+              await docSnap.ref.set(patch, { merge: true })
+              data = { ...data, ...patch, updatedAt: data.updatedAt }
+              data.shippingAddress = shipping
+              if (patch.customerName) data.customerName = patch.customerName
+              if (patch.phone) data.phone = patch.phone
+            }
+          } catch (err) {
+            console.warn('Order address backfill failed:', docSnap.id, err?.message || err)
+          }
+        }
+
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: serializeAdminTimestamp(data.createdAt),
+          shippedAt: serializeAdminTimestamp(data.shippedAt),
+          deliveredAt: serializeAdminTimestamp(data.deliveredAt),
+          trackingUpdatedAt: serializeAdminTimestamp(data.trackingUpdatedAt),
+          updatedAt: serializeAdminTimestamp(data.updatedAt),
+        }
+      }),
+    )
+
+    res.json({ orders })
+  } catch (err) {
+    sendHttpError(res, err)
+  }
+})
+
+function resolveOrderPackaging(orderData, packageTypeOverride) {
+  const suggestion = orderData.packagingSuggestion || suggestPackaging(
+    (orderData.items || []).map((item) => ({
+      quantity: item.quantity,
+      product: {
+        name: item.name,
+        shipClass: item.shipClass,
+        weightOz: item.weightOz ?? undefined,
+        thicknessIn: item.thicknessIn ?? undefined,
+        maxLetterQty: item.maxLetterQty ?? undefined,
+      },
+    })),
+  )
+
+  const packageType = packageTypeOverride || orderData.packageType || suggestion.packageType
+  const override = packagingOverride(packageType)
+
+  return {
+    ...suggestion,
+    ...override,
+    weightOz: suggestion.weightOz || 1,
+    dims: override.dims || PACKAGE_DIMS[override.packageType] || PACKAGE_DIMS.bubble_mailer,
+  }
+}
+
+exports.adminOrderRates = onRequest(
+  { ...httpOptions, secrets: [adminEmailsSecret, shippoApiTokenSecret, shipFromJsonSecret], timeoutSeconds: 60 },
+  async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('')
+    return
+  }
+
+  if (req.method !== 'POST') {
+    sendMethodNotAllowed(res, 'POST')
+    return
+  }
+
+  try {
+    await requireAdminRequest(req)
+
+    const orderId = String(req.body?.orderId ?? '').trim()
+    if (!orderId) {
+      res.status(400).json({ error: 'orderId is required' })
+      return
+    }
+
+    const orderSnap = await getFirestore().collection('orders').doc(orderId).get()
+    if (!orderSnap.exists) {
+      res.status(404).json({ error: 'Order not found' })
+      return
+    }
+
+    const order = orderSnap.data()
+    if (!order.shippingAddress?.line1) {
+      res.status(400).json({ error: 'Order has no shipping address' })
+      return
+    }
+
+    const packaging = resolveOrderPackaging(order, req.body?.packageType)
+
+    if (packaging.postageMode === 'stamp') {
+      res.json({
+        postageMode: 'stamp',
+        packaging,
+        rates: [],
+        recommendedRateId: null,
+        message: 'This order is letter-eligible. Use a stamp instead of buying a carrier label.',
+      })
+      return
+    }
+
+    const result = await createShipmentRates({
+      toAddress: {
+        ...order.shippingAddress,
+        email: order.email || '',
+        phone: order.phone || order.shippingAddress.phone || '',
+      },
+      dims: packaging.dims,
+      weightOz: packaging.weightOz,
+      shippingRateName: order.shippingRateName || '',
+    })
+
+    res.json({
+      postageMode: 'label',
+      packaging,
+      ...result,
+    })
+  } catch (err) {
+    sendHttpError(res, err)
+  }
+})
+
+exports.adminOrderLabel = onRequest(
+  { ...httpOptions, secrets: [adminEmailsSecret, shippoApiTokenSecret, shipFromJsonSecret, resendApiKeySecret, mailFromSecret], timeoutSeconds: 120 },
+  async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res, 'POST')
+      return
+    }
+
+    try {
+      await requireAdminRequest(req)
+
+      const orderId = String(req.body?.orderId ?? '').trim()
+      let rateId = String(req.body?.rateId ?? '').trim()
+      const packageType = req.body?.packageType
+
+      if (!orderId) {
+        res.status(400).json({ error: 'orderId is required' })
+        return
+      }
+
+      const orderRef = getFirestore().collection('orders').doc(orderId)
+      const orderSnap = await orderRef.get()
+
+      if (!orderSnap.exists) {
+        res.status(404).json({ error: 'Order not found' })
+        return
+      }
+
+      const order = orderSnap.data()
+      if (!order.shippingAddress?.line1) {
+        res.status(400).json({ error: 'Order has no shipping address' })
+        return
+      }
+
+      const packaging = resolveOrderPackaging(order, packageType)
+
+      if (packaging.postageMode === 'stamp') {
+        res.status(400).json({
+          error: 'This order is letter-eligible. Mark it fulfilled with a stamp instead of buying a label.',
+        })
+        return
+      }
+
+      if (!rateId) {
+        const rates = await createShipmentRates({
+          toAddress: {
+            ...order.shippingAddress,
+            email: order.email || '',
+            phone: order.phone || order.shippingAddress.phone || '',
+          },
+          dims: packaging.dims,
+          weightOz: packaging.weightOz,
+          shippingRateName: order.shippingRateName || '',
+        })
+        rateId = rates.recommendedRateId
+      }
+
+      if (!rateId) {
+        res.status(400).json({ error: 'No shipping rate available for this package' })
+        return
+      }
+
+      const label = await purchaseLabel(rateId)
+
+      if (label.trackingNumber) {
+        await registerTracking({
+          carrier: label.carrier,
+          trackingNumber: label.trackingNumber,
+          metadata: orderId,
+        })
+      }
+
+      const customerName =
+        order.customerName || order.shippingAddress?.name || order.email || ''
+
+      await orderRef.set(
+        {
+          packageType: packaging.packageType,
+          postageMode: 'label',
+          labelUrl: label.labelUrl,
+          trackingNumber: label.trackingNumber,
+          trackingUrl: label.trackingUrl,
+          carrier: label.carrier,
+          shippoTransactionId: label.transactionId,
+          trackingStatus: 'PRE_TRANSIT',
+          trackingStatusDetail: 'Label created',
+          trackingUpdatedAt: FieldValue.serverTimestamp(),
+          fulfillmentStatus: 'fulfilled',
+          shippedAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+
+      const mailResult = await sendShippingConfirmationEmail({
+        to: order.email,
+        customerName,
+        orderId,
+        carrier: label.carrier,
+        trackingNumber: label.trackingNumber,
+        trackingUrl: label.trackingUrl,
+      })
+
+      res.json({
+        ok: true,
+        labelUrl: label.labelUrl,
+        trackingNumber: label.trackingNumber,
+        trackingUrl: label.trackingUrl,
+        carrier: label.carrier,
+        packaging,
+        emailSent: mailResult.sent === true,
+        emailNote: mailResult.sent ? null : mailResult.reason || null,
+      })
+    } catch (err) {
+      sendHttpError(res, err)
+    }
+  },
+)
+
+/**
+ * Shippo webhook for tracking updates.
+ * Configure in Shippo: Settings → Webhooks → track_updated
+ * URL: https://us-central1-<project>.cloudfunctions.net/shippoWebhook
+ */
+exports.shippoWebhook = onRequest(
+  { region, invoker: 'public', secrets: [shippoApiTokenSecret, shipFromJsonSecret, resendApiKeySecret, mailFromSecret], timeoutSeconds: 60 },
+  async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.status(204).send('')
+      return
+    }
+
+    if (req.method !== 'POST') {
+      sendMethodNotAllowed(res, 'POST')
+      return
+    }
+
+    try {
+      const event = typeof req.body?.event === 'string' ? req.body.event : ''
+      const data = req.body?.data && typeof req.body.data === 'object' ? req.body.data : req.body
+
+      if (event && event !== 'track_updated' && event !== 'TrackUpdated') {
+        res.json({ ok: true, ignored: event })
+        return
+      }
+
+      const trackingNumber =
+        typeof data?.tracking_number === 'string'
+          ? data.tracking_number
+          : typeof data?.trackingNumber === 'string'
+            ? data.trackingNumber
+            : ''
+
+      if (!trackingNumber) {
+        res.status(400).json({ error: 'Missing tracking_number' })
+        return
+      }
+
+      const status =
+        normalizeTrackingStatus(data.tracking_status) ||
+        normalizeTrackingStatus(data.status) ||
+        'UNKNOWN'
+      const statusDetail =
+        (data.tracking_status && typeof data.tracking_status.status_details === 'string'
+          ? data.tracking_status.status_details
+          : null) ||
+        (typeof data.status_details === 'string' ? data.status_details : '') ||
+        status
+
+      const trackingUrl =
+        typeof data.tracking_url_provider === 'string'
+          ? data.tracking_url_provider
+          : typeof data.trackingUrl === 'string'
+            ? data.trackingUrl
+            : null
+
+      const metadata = typeof data.metadata === 'string' ? data.metadata.trim() : ''
+      const db = getFirestore()
+      let orderRef = null
+
+      if (metadata) {
+        const byId = await db.collection('orders').doc(metadata).get()
+        if (byId.exists) orderRef = byId.ref
+      }
+
+      if (!orderRef) {
+        const snap = await db
+          .collection('orders')
+          .where('trackingNumber', '==', trackingNumber)
+          .limit(1)
+          .get()
+        if (!snap.empty) orderRef = snap.docs[0].ref
+      }
+
+      if (!orderRef) {
+        res.json({ ok: true, matched: false, trackingNumber, status })
+        return
+      }
+
+      const orderSnap = await orderRef.get()
+      const order = orderSnap.data() || {}
+      const updates = {
+        trackingStatus: status,
+        trackingStatusDetail: statusDetail,
+        trackingUpdatedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }
+
+      if (trackingUrl) updates.trackingUrl = trackingUrl
+
+      if (status === 'DELIVERED') {
+        updates.deliveredAt = FieldValue.serverTimestamp()
+        if (order.fulfillmentStatus !== 'fulfilled') {
+          updates.fulfillmentStatus = 'fulfilled'
+        }
+      } else if (
+        ['TRANSIT', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PRE_TRANSIT'].includes(status) &&
+        order.fulfillmentStatus === 'unfulfilled'
+      ) {
+        updates.fulfillmentStatus = 'fulfilled'
+        if (!order.shippedAt) updates.shippedAt = FieldValue.serverTimestamp()
+      }
+
+      await orderRef.set(updates, { merge: true })
+
+      if (status === 'DELIVERED' && order.email && !order.deliveredEmailSent) {
+        await sendDeliveredEmail({
+          to: order.email,
+          customerName: order.customerName || order.shippingAddress?.name || '',
+          orderId: orderRef.id,
+          trackingUrl: trackingUrl || order.trackingUrl || null,
+        })
+        await orderRef.set({ deliveredEmailSent: true }, { merge: true })
+      }
+
+      res.json({ ok: true, matched: true, orderId: orderRef.id, status })
+    } catch (err) {
+      console.error('Shippo webhook error:', err)
+      sendHttpError(res, err)
+    }
+  },
+)

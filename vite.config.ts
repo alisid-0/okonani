@@ -49,10 +49,35 @@ export default defineConfig(({ mode }) => {
               changeOrigin: true,
               rewrite: () => '/adminReadMedia',
             },
+            '/api/admin/orders/rates': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminOrderRates',
+            },
+            '/api/admin/orders/label': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminOrderLabel',
+            },
+            '/api/admin/orders': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/adminListOrders',
+            },
+            '/api/shipping/quote': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/quoteCheckoutShipping',
+            },
             '/api/create-checkout-session': {
               target: functionsOrigin,
               changeOrigin: true,
               rewrite: () => '/createCheckoutSession',
+            },
+            '/api/checkout/shipping': {
+              target: functionsOrigin,
+              changeOrigin: true,
+              rewrite: () => '/updateCheckoutShipping',
             },
             '/api/checkout-session': {
               target: functionsOrigin,

@@ -22,18 +22,13 @@ export default function About() {
         <div className="about-copy">
           <div className="about-card content-block">
             <p>
-              Hi! I&apos;m the person behind okonani, and I make every charm you see here by hand.
-              What started as something small for myself grew into a little shop where I get to share
-              pieces I&apos;m genuinely excited about.
+              Hi!! I'm the person behind okonani! I make every charm and every sticker by hand.
+              Not long ago, I was just hopping from one convention to another, and one day I sat down and faced my fears
+              and made my first charm. I've been making charms and stickers ever since, and I'm so grateful for the support
+              I've received from you all!
             </p>
             <p>
-              I&apos;m Palestinian, and that part of who I am shows up in how I work: patient, careful,
-              and proud of the details. I want each charm to feel personal, like something you picked
-              out because it actually means something to you.
-            </p>
-            <p>
-              Thank you for being here. Every order supports an independent maker, and I&apos;m so
-              grateful you stopped by.
+              I'm still new to this and I'm still learning, but I can't wait to see where this journey takes me!
             </p>
           </div>
         </div>

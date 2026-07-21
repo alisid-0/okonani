@@ -1,12 +1,15 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from 'react'
 import { collection, doc } from 'firebase/firestore'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../data/categories'
-import { getProductCover, type ProductMedia } from '../data/products'
+import { getProductCover, formatPrice, type ProductMedia } from '../data/products'
 import {
+  batchUpdateAdminProducts,
   deleteAdminProduct,
+  listAdminProductTypes,
   listAdminProducts,
+  listAdminShippingTypes,
   saveAdminProduct,
   updateProductSortOrders,
   type AdminProduct,
@@ -15,12 +18,24 @@ import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
 import ImageCropModal from '../components/ImageCropModal'
 import SortableList from '../components/SortableList'
+import type { ProductType } from '../data/productTypes'
+import type { ShippingType } from '../data/shippingTypes'
 import AdminCategories from './AdminCategories'
 import AdminMessages from './AdminMessages'
+import AdminOrders from './AdminOrders'
 import AdminPages from './AdminPages'
+import AdminProductTypes from './AdminProductTypes'
+import AdminShippingTypes from './AdminShippingTypes'
 
 type EditorTab = 'details' | 'media'
-type AdminPanel = 'products' | 'categories' | 'messages' | 'pages'
+type AdminPanel =
+  | 'products'
+  | 'categories'
+  | 'messages'
+  | 'pages'
+  | 'orders'
+  | 'productTypes'
+  | 'shippingTypes'
 
 type PendingCrop =
   | { kind: 'new'; file: File }
@@ -34,7 +49,12 @@ type ProductForm = {
   price: string
   active: boolean
   category: string
+  productTypeId: string
   media: ProductMedia[]
+  shipClass: 'letter' | 'soft_pack' | 'parcel'
+  weightOz: string
+  thicknessIn: string
+  maxLetterQty: string
 }
 
 const emptyForm = (): ProductForm => ({
@@ -45,7 +65,12 @@ const emptyForm = (): ProductForm => ({
   price: '',
   active: true,
   category: '',
+  productTypeId: '',
   media: [],
+  shipClass: 'soft_pack',
+  weightOz: '1',
+  thicknessIn: '0.5',
+  maxLetterQty: '0',
 })
 
 function dollarsToCents(value: string): number {
@@ -65,8 +90,35 @@ function newMediaItem(type: ProductMedia['type'] = 'image'): ProductMedia {
 export default function Admin() {
   const { logOut } = useAuth()
   const { categories } = useCategories()
-  const [panel, setPanel] = useState<AdminPanel>('products')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [panel, setPanel] = useState<AdminPanel>(() => {
+    const fromUrl = searchParams.get('panel')
+    if (
+      fromUrl === 'orders' ||
+      fromUrl === 'productTypes' ||
+      fromUrl === 'shippingTypes' ||
+      fromUrl === 'categories' ||
+      fromUrl === 'messages' ||
+      fromUrl === 'pages' ||
+      fromUrl === 'products'
+    ) {
+      return fromUrl
+    }
+    return 'products'
+  })
+  const initialOrderId = searchParams.get('order')
+
+  function selectPanel(next: AdminPanel) {
+    setPanel(next)
+    const params = new URLSearchParams(searchParams)
+    params.set('panel', next)
+    if (next !== 'orders') params.delete('order')
+    setSearchParams(params, { replace: true })
+  }
+
   const [products, setProducts] = useState<AdminProduct[]>([])
+  const [productTypes, setProductTypes] = useState<ProductType[]>([])
+  const [shippingTypes, setShippingTypes] = useState<ShippingType[]>([])
   const [form, setForm] = useState<ProductForm>(emptyForm())
   const [tab, setTab] = useState<EditorTab>('details')
   const [loading, setLoading] = useState(true)
@@ -74,6 +126,11 @@ export default function Admin() {
   const [uploading, setUploading] = useState(false)
   const [cropQueue, setCropQueue] = useState<PendingCrop[]>([])
   const [reorderingProducts, setReorderingProducts] = useState(false)
+  const [productMode, setProductMode] = useState<'list' | 'edit'>('list')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [batchProductTypeId, setBatchProductTypeId] = useState('')
+  const [batchCategoryId, setBatchCategoryId] = useState('')
+  const [batchBusy, setBatchBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const draftProductIdRef = useRef('')
@@ -83,8 +140,14 @@ export default function Admin() {
     setError(null)
 
     try {
-      const data = await listAdminProducts()
+      const [data, nextProductTypes, nextShippingTypes] = await Promise.all([
+        listAdminProducts(),
+        listAdminProductTypes(),
+        listAdminShippingTypes(),
+      ])
       setProducts(data.products)
+      setProductTypes(nextProductTypes)
+      setShippingTypes(nextShippingTypes)
 
       if (selectId) {
         const selected = data.products.find((product) => product.id === selectId)
@@ -110,6 +173,7 @@ export default function Admin() {
     setTab('details')
     setMessage(null)
     setError(null)
+    setProductMode('edit')
     draftProductIdRef.current = product.id
 
     const resolvedCategory =
@@ -125,17 +189,52 @@ export default function Admin() {
       price: (product.priceInCents / 100).toFixed(2),
       active: product.active,
       category: resolvedCategory,
+      productTypeId: product.productTypeId ?? '',
       media: product.media.length > 0 ? product.media : [],
+      shipClass: product.shipClass,
+      weightOz: String(product.weightOz),
+      thicknessIn: String(product.thicknessIn),
+      maxLetterQty: String(product.maxLetterQty),
     })
+  }
+
+  function applyProductTypeDefaults(productTypeId: string, current: ProductForm): ProductForm {
+    const productType = productTypes.find((type) => type.id === productTypeId)
+    if (!productType) return { ...current, productTypeId }
+
+    const shippingType = shippingTypes.find((type) => type.id === productType.shippingTypeId)
+    const shipClass = shippingType?.shipClass ?? current.shipClass
+    return {
+      ...current,
+      productTypeId,
+      price:
+        productType.defaultPriceCents > 0
+          ? (productType.defaultPriceCents / 100).toFixed(2)
+          : current.price,
+      shipClass,
+      weightOz: shipClass === 'letter' ? '0.1' : shipClass === 'parcel' ? '4' : '1',
+      thicknessIn: shipClass === 'letter' ? '0.02' : shipClass === 'parcel' ? '2' : '0.5',
+      maxLetterQty: String(productType.maxLetterQty),
+    }
+  }
+
+  function backToProductList() {
+    setProductMode('list')
+    setForm(emptyForm())
+    draftProductIdRef.current = ''
+    setTab('details')
+    setError(null)
   }
 
   function startCreate() {
     const nextId = createProductId()
     draftProductIdRef.current = nextId
+    setProductMode('edit')
     setForm({
       ...emptyForm(),
       id: nextId,
       category: categories[0]?.id ?? '',
+      productTypeId: productTypes[0]?.id ?? '',
     })
     setTab('details')
     setMessage(null)
@@ -168,6 +267,11 @@ export default function Admin() {
         sortOrder: existingProduct?.sortOrder ?? 0,
         category: form.category,
         media: form.media.filter((item) => item.url.trim()),
+        productTypeId: form.productTypeId,
+        shipClass: form.shipClass,
+        weightOz: Number.parseFloat(form.weightOz) || 0.1,
+        thicknessIn: Number.parseFloat(form.thicknessIn) || 0,
+        maxLetterQty: Number.parseInt(form.maxLetterQty, 10) || 0,
       })
       setMessage(`Saved "${data.product.name}" and synced to Stripe.`)
       await loadProducts(data.product.id)
@@ -326,6 +430,75 @@ export default function Admin() {
     }
   }
 
+  function toggleSelected(productId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
+    )
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.length === products.length ? [] : products.map((product) => product.id)))
+  }
+
+  async function handleBatchAssignProductType() {
+    if (selectedIds.length === 0 || !batchProductTypeId) return
+    setBatchBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const result = await batchUpdateAdminProducts(
+        selectedIds,
+        { productTypeId: batchProductTypeId, applyProductTypeDefaults: true },
+        { productTypes, shippingTypes },
+      )
+      setMessage(`Updated product type on ${result.updated} product${result.updated === 1 ? '' : 's'}.`)
+      setSelectedIds([])
+      setBatchProductTypeId('')
+      await loadProducts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Batch update failed')
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  async function handleBatchAssignCategory() {
+    if (selectedIds.length === 0 || !batchCategoryId) return
+    setBatchBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const result = await batchUpdateAdminProducts(selectedIds, { category: batchCategoryId })
+      setMessage(`Updated category on ${result.updated} product${result.updated === 1 ? '' : 's'}.`)
+      setSelectedIds([])
+      setBatchCategoryId('')
+      await loadProducts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Batch update failed')
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  async function handleBatchSetActive(active: boolean) {
+    if (selectedIds.length === 0) return
+    setBatchBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const result = await batchUpdateAdminProducts(selectedIds, { active })
+      setMessage(
+        `${active ? 'Published' : 'Hidden'} ${result.updated} product${result.updated === 1 ? '' : 's'}.`,
+      )
+      setSelectedIds([])
+      await loadProducts()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Batch update failed')
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
   const activeCrop = cropQueue[0]
 
   async function handleDelete(product: AdminProduct) {
@@ -337,7 +510,8 @@ export default function Admin() {
     try {
       await deleteAdminProduct(product.id, product.stripePriceId, product.stripeProductId)
       setMessage(`Removed "${product.name}".`)
-      if (form.id === product.id) startCreate()
+      setSelectedIds((prev) => prev.filter((id) => id !== product.id))
+      backToProductList()
       await loadProducts()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove product')
@@ -361,7 +535,6 @@ export default function Admin() {
     })
   }
 
-  const selectedId = form.id
   const cover = getProductCover({ media: form.media })
 
   function categoryName(categoryId: string): string {
@@ -393,86 +566,59 @@ export default function Admin() {
           <button
             type="button"
             className={`admin-sidebar-nav-btn ${panel === 'products' ? 'is-active' : ''}`}
-            onClick={() => setPanel('products')}
+            onClick={() => {
+              selectPanel('products')
+              setProductMode('list')
+              setError(null)
+            }}
           >
             Products
           </button>
           <button
             type="button"
+            className={`admin-sidebar-nav-btn ${panel === 'orders' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('orders')}
+          >
+            Orders
+          </button>
+          <button
+            type="button"
+            className={`admin-sidebar-nav-btn ${panel === 'productTypes' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('productTypes')}
+          >
+            Product types
+          </button>
+          <button
+            type="button"
+            className={`admin-sidebar-nav-btn ${panel === 'shippingTypes' ? 'is-active' : ''}`}
+            onClick={() => selectPanel('shippingTypes')}
+          >
+            Shipping
+          </button>
+          <button
+            type="button"
             className={`admin-sidebar-nav-btn ${panel === 'categories' ? 'is-active' : ''}`}
-            onClick={() => setPanel('categories')}
+            onClick={() => selectPanel('categories')}
           >
             Categories
           </button>
           <button
             type="button"
             className={`admin-sidebar-nav-btn ${panel === 'messages' ? 'is-active' : ''}`}
-            onClick={() => setPanel('messages')}
+            onClick={() => selectPanel('messages')}
           >
             Messages
           </button>
           <button
             type="button"
             className={`admin-sidebar-nav-btn ${panel === 'pages' ? 'is-active' : ''}`}
-            onClick={() => setPanel('pages')}
+            onClick={() => selectPanel('pages')}
           >
             Pages
           </button>
         </div>
 
-        {panel !== 'products' && <div className="admin-sidebar-fill" aria-hidden="true" />}
-
-        {panel === 'products' && (
-          <>
-        <div className="admin-sidebar-actions">
-          <button type="button" className="btn btn-primary btn-sm btn-full" onClick={startCreate}>
-            + New product
-          </button>
-        </div>
-
-        <p className="admin-sidebar-sort-hint">Drag ⠿ to set storefront order</p>
-
-        <div className="admin-sidebar-list">
-          {loading && <p className="admin-sidebar-empty">Loading…</p>}
-          {!loading && products.length === 0 && (
-            <p className="admin-sidebar-empty">No products yet.</p>
-          )}
-
-          {!loading && products.length > 0 && (
-            <SortableList
-              className="admin-sidebar-sortable"
-              rowClassName="admin-sidebar-sortable-row"
-              ariaLabel="Products"
-              items={products}
-              onReorder={handleReorderProducts}
-              renderItem={(product) => {
-                const thumb = getProductCover(product)
-                return (
-                  <button
-                    type="button"
-                    className={`admin-sidebar-item ${selectedId === product.id ? 'is-selected' : ''}`}
-                    onClick={() => selectProduct(product)}
-                    disabled={reorderingProducts}
-                  >
-                    <span className="admin-sidebar-thumb">
-                      {thumb ?
-                        <img src={thumb} alt="" />
-                      : <span aria-hidden="true">✿</span>}
-                    </span>
-                    <span className="admin-sidebar-copy">
-                      <strong>{product.name}</strong>
-                      <span className={isCategoryMissing(product.category) ? 'admin-warning-text' : undefined}>
-                        {categoryName(product.category)} · {product.active ? 'Live' : 'Hidden'}
-                      </span>
-                    </span>
-                  </button>
-                )
-              }}
-            />
-          )}
-        </div>
-          </>
-        )}
+        <div className="admin-sidebar-fill" aria-hidden="true" />
 
         <div className="admin-sidebar-footer">
           <Link to="/store" className="admin-footer-link">
@@ -485,21 +631,201 @@ export default function Admin() {
       </aside>
 
       <main className="admin-main">
-        {panel === 'categories' ?
+        {panel === 'orders' ?
+          <AdminOrders initialOrderId={initialOrderId} />
+        : panel === 'productTypes' ?
+          <AdminProductTypes />
+        : panel === 'shippingTypes' ?
+          <AdminShippingTypes />
+        : panel === 'categories' ?
           <AdminCategories />
         : panel === 'messages' ?
           <AdminMessages />
         : panel === 'pages' ?
           <AdminPages />
+        : productMode === 'list' ?
+          <>
+            <header className="admin-main-header">
+              <div>
+                <p className="admin-main-eyebrow">Catalog</p>
+                <h1>Products</h1>
+                <p className="admin-empty-copy">
+                  {loading ? 'Loading…' : `${products.length} product${products.length === 1 ? '' : 's'}`}
+                  · drag ⠿ to set storefront order
+                </p>
+              </div>
+              <div className="admin-main-actions">
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadProducts()}>
+                  Refresh
+                </button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={startCreate}>
+                  + Create product
+                </button>
+              </div>
+            </header>
+
+            {message && <p className="admin-alert admin-alert-success">{message}</p>}
+            {error && <p className="admin-alert admin-alert-error">{error}</p>}
+
+            {selectedIds.length > 0 && (
+              <div className="admin-products-bulk admin-card">
+                <div className="admin-products-bulk-top">
+                  <strong>{selectedIds.length} selected</strong>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedIds([])}>
+                    Clear
+                  </button>
+                </div>
+                <div className="admin-products-bulk-grid">
+                  <label>
+                    Product type
+                    <select value={batchProductTypeId} onChange={(e) => setBatchProductTypeId(e.target.value)}>
+                      <option value="">Choose…</option>
+                      {productTypes.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={!batchProductTypeId || batchBusy}
+                    onClick={() => void handleBatchAssignProductType()}
+                  >
+                    Apply type
+                  </button>
+                  <label>
+                    Category
+                    <select value={batchCategoryId} onChange={(e) => setBatchCategoryId(e.target.value)}>
+                      <option value="">Choose…</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={!batchCategoryId || batchBusy}
+                    onClick={() => void handleBatchAssignCategory()}
+                  >
+                    Apply category
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={batchBusy}
+                    onClick={() => void handleBatchSetActive(true)}
+                  >
+                    Set live
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={batchBusy}
+                    onClick={() => void handleBatchSetActive(false)}
+                  >
+                    Hide
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <section className="admin-card admin-products-list-card">
+              <div className="admin-products-list-toolbar">
+                <label className="admin-products-select-all">
+                  <input
+                    type="checkbox"
+                    checked={products.length > 0 && selectedIds.length === products.length}
+                    onChange={toggleSelectAll}
+                    disabled={products.length === 0}
+                  />
+                  Select all
+                </label>
+              </div>
+
+              {loading && <p className="admin-empty-copy">Loading products…</p>}
+              {!loading && products.length === 0 && (
+                <div className="admin-products-empty">
+                  <p>No products yet.</p>
+                  <button type="button" className="btn btn-primary" onClick={startCreate}>
+                    Create your first product
+                  </button>
+                </div>
+              )}
+
+              {!loading && products.length > 0 && (
+                <SortableList
+                  className="admin-products-sortable"
+                  rowClassName="admin-products-sortable-row"
+                  ariaLabel="Products"
+                  items={products}
+                  onReorder={handleReorderProducts}
+                  renderItem={(product) => {
+                    const thumb = getProductCover(product)
+                    const typeName =
+                      productTypes.find((type) => type.id === product.productTypeId)?.name ?? 'No type'
+                    return (
+                      <div className="admin-products-row">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(product.id)}
+                          onChange={() => toggleSelected(product.id)}
+                          aria-label={`Select ${product.name}`}
+                        />
+                        <button
+                          type="button"
+                          className="admin-products-row-main"
+                          onClick={() => void selectProduct(product)}
+                          disabled={reorderingProducts}
+                        >
+                          <span className="admin-products-thumb">
+                            {thumb ? <img src={thumb} alt="" /> : <span aria-hidden="true">✿</span>}
+                          </span>
+                          <span className="admin-products-row-copy">
+                            <strong>{product.name}</strong>
+                            <span className={isCategoryMissing(product.category) ? 'admin-warning-text' : undefined}>
+                              {categoryName(product.category)} · {typeName}
+                            </span>
+                          </span>
+                          <span className="admin-products-row-meta">
+                            <span>{formatPrice(product.priceInCents)}</span>
+                            <span className={`admin-products-status ${product.active ? 'is-live' : 'is-hidden'}`}>
+                              {product.active ? 'Live' : 'Hidden'}
+                            </span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => void selectProduct(product)}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )
+                  }}
+                />
+              )}
+            </section>
+          </>
         : <>
         <header className="admin-main-header">
           <div>
-            <p className="admin-main-eyebrow">{form.id ? 'Editing product' : 'Create product'}</p>
+            <button type="button" className="admin-back-link" onClick={backToProductList}>
+              ← Back to products
+            </button>
+            <p className="admin-main-eyebrow">
+              {products.some((item) => item.id === form.id) ? 'Editing product' : 'Create product'}
+            </p>
             <h1>{form.name || 'Untitled product'}</h1>
           </div>
 
           <div className="admin-main-actions">
-            {form.id && (
+            {form.id && products.some((item) => item.id === form.id) && (
               <Link to={`/store/${form.id}`} className="btn btn-ghost btn-sm" target="_blank" rel="noreferrer">
                 Preview page
               </Link>
@@ -593,6 +919,23 @@ export default function Admin() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  Product type (internal)
+                  <select
+                    value={form.productTypeId}
+                    onChange={(e) => {
+                      const productTypeId = e.target.value
+                      setForm((prev) => applyProductTypeDefaults(productTypeId, prev))
+                    }}
+                  >
+                    <option value="">None</option>
+                    {productTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="admin-toggle">
                   <input
                     type="checkbox"
@@ -613,6 +956,56 @@ export default function Admin() {
                     </p>
                   </div>
                 )}
+              </div>
+
+              <div className="admin-card">
+                <h2>Shipping profile</h2>
+                <p className="admin-field-hint">
+                  Letter vs bubble mailer is controlled by the product type (letter-eligible stickers/sheets).
+                  Weight is used for Shippo bubble-mailer quotes.
+                </p>
+                <label>
+                  Ship class
+                  <select
+                    value={form.shipClass}
+                    onChange={(e) => {
+                      const shipClass = e.target.value as ProductForm['shipClass']
+                      setForm((prev) => ({
+                        ...prev,
+                        shipClass,
+                        weightOz: shipClass === 'letter' ? '0.1' : shipClass === 'parcel' ? '4' : '1',
+                        thicknessIn: shipClass === 'letter' ? '0.02' : shipClass === 'parcel' ? '2' : '0.5',
+                        maxLetterQty: shipClass === 'letter' ? '10' : '0',
+                      }))
+                    }}
+                  >
+                    <option value="letter">Letter (flat)</option>
+                    <option value="soft_pack">Soft pack (bubble mailer)</option>
+                    <option value="parcel">Parcel</option>
+                  </select>
+                </label>
+                <label>
+                  Weight (oz)
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={form.weightOz}
+                    onChange={(e) => setForm((prev) => ({ ...prev, weightOz: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Thickness (inches)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.thicknessIn}
+                    onChange={(e) => setForm((prev) => ({ ...prev, thicknessIn: e.target.value }))}
+                    required
+                  />
+                </label>
               </div>
             </div>
           )}
@@ -751,13 +1144,16 @@ export default function Admin() {
           )}
 
           <footer className="admin-editor-footer">
-            {form.id && (
+            <button type="button" className="btn btn-ghost" onClick={backToProductList}>
+              Cancel
+            </button>
+            {form.id && products.some((item) => item.id === form.id) && (
               <button
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => {
                   const product = products.find((item) => item.id === form.id)
-                  if (product) handleDelete(product)
+                  if (product) void handleDelete(product)
                 }}
               >
                 Delete product

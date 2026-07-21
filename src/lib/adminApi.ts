@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -21,6 +22,16 @@ import {
   type SiteSettings,
 } from '../data/siteSettings'
 import type { StoreCategory } from '../data/categories'
+import {
+  parseProductType,
+  DEFAULT_PRODUCT_TYPES,
+  type ProductType,
+} from '../data/productTypes'
+import {
+  parseShippingType,
+  DEFAULT_SHIPPING_TYPES,
+  type ShippingType,
+} from '../data/shippingTypes'
 import { auth, db } from './firebase'
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? ''
@@ -69,7 +80,14 @@ async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    throw new Error(typeof data.error === 'string' ? data.error : 'Request failed')
+    const detail =
+      typeof data.error === 'string'
+        ? data.error
+        : typeof data.message === 'string'
+          ? data.message
+          : `Request failed (${res.status})`
+    console.error(`[adminApi] ${path} → ${res.status}`, data)
+    throw new Error(detail)
   }
 
   return data as T
@@ -102,6 +120,11 @@ export type AdminProduct = {
   createdAt: string | null
   category: string
   media: ProductMedia[]
+  productTypeId: string
+  shipClass: 'letter' | 'soft_pack' | 'parcel'
+  weightOz: number
+  thicknessIn: number
+  maxLetterQty: number
   stripeProductId: string | null
   stripePriceId: string | null
   stripeSyncedAt: string | null
@@ -142,6 +165,12 @@ function parseAdminProduct(id: string, data: Record<string, unknown>): AdminProd
     createdAt: product.createdAt ?? null,
     category: product.category ?? '',
     media: product.media,
+    productTypeId: product.productTypeId ?? '',
+    shipClass: product.shipClass ?? 'soft_pack',
+    weightOz: product.weightOz ?? (product.shipClass === 'letter' ? 0.1 : product.shipClass === 'parcel' ? 4 : 1),
+    thicknessIn:
+      product.thicknessIn ?? (product.shipClass === 'letter' ? 0.02 : product.shipClass === 'parcel' ? 2 : 0.5),
+    maxLetterQty: product.maxLetterQty ?? (product.shipClass === 'letter' ? 10 : 0),
     stripeProductId: typeof data.stripeProductId === 'string' ? data.stripeProductId : null,
     stripePriceId: typeof data.stripePriceId === 'string' ? data.stripePriceId : null,
     stripeSyncedAt: typeof data.stripeSyncedAt === 'string' ? data.stripeSyncedAt : null,
@@ -295,6 +324,11 @@ export async function saveAdminProduct(input: {
   sortOrder: number
   category: string
   media: ProductMedia[]
+  productTypeId?: string
+  shipClass: 'letter' | 'soft_pack' | 'parcel'
+  weightOz: number
+  thicknessIn: number
+  maxLetterQty: number
 }): Promise<{ product: AdminProduct }> {
   await ensureAdminFirestoreAccess()
 
@@ -339,6 +373,11 @@ export async function saveAdminProduct(input: {
     sortOrder,
     category: input.category.trim(),
     media: serializeMedia(input.media),
+    productTypeId: (input.productTypeId ?? '').trim(),
+    shipClass: input.shipClass,
+    weightOz: Math.max(0.01, Number(input.weightOz) || 0.1),
+    thicknessIn: Math.max(0, Number(input.thicknessIn) || 0),
+    maxLetterQty: Math.max(0, Math.round(Number(input.maxLetterQty) || 0)),
     isDeleted: false,
     stripeProductId: stripeFields.stripeProductId ?? existing?.stripeProductId ?? null,
     stripePriceId: stripeFields.stripePriceId ?? existing?.stripePriceId ?? null,
@@ -357,6 +396,84 @@ export async function saveAdminProduct(input: {
   }
 
   return { product }
+}
+
+export async function batchUpdateAdminProducts(
+  productIds: string[],
+  patch: {
+    productTypeId?: string
+    category?: string
+    active?: boolean
+    shipClass?: 'letter' | 'soft_pack' | 'parcel'
+    weightOz?: number
+    thicknessIn?: number
+    maxLetterQty?: number
+    applyProductTypeDefaults?: boolean
+  },
+  helpers?: {
+    productTypes?: ProductType[]
+    shippingTypes?: ShippingType[]
+  },
+): Promise<{ updated: number }> {
+  await ensureAdminFirestoreAccess()
+
+  const ids = [...new Set(productIds.map((id) => id.trim()).filter(Boolean))]
+  if (ids.length === 0) return { updated: 0 }
+
+  const productType =
+    patch.productTypeId && helpers?.productTypes
+      ? helpers.productTypes.find((type) => type.id === patch.productTypeId)
+      : null
+  const shippingType =
+    productType?.shippingTypeId && helpers?.shippingTypes
+      ? helpers.shippingTypes.find((type) => type.id === productType.shippingTypeId)
+      : null
+
+  await Promise.all(
+    ids.map(async (productId) => {
+      const updates: Record<string, unknown> = {
+        updatedAt: serverTimestamp(),
+      }
+
+      if (typeof patch.productTypeId === 'string') {
+        updates.productTypeId = patch.productTypeId.trim()
+      }
+      if (typeof patch.category === 'string') {
+        updates.category = patch.category.trim()
+      }
+      if (typeof patch.active === 'boolean') {
+        updates.active = patch.active
+      }
+      if (patch.shipClass) {
+        updates.shipClass = patch.shipClass
+      }
+      if (typeof patch.weightOz === 'number') {
+        updates.weightOz = Math.max(0.01, patch.weightOz)
+      }
+      if (typeof patch.thicknessIn === 'number') {
+        updates.thicknessIn = Math.max(0, patch.thicknessIn)
+      }
+      if (typeof patch.maxLetterQty === 'number') {
+        updates.maxLetterQty = Math.max(0, Math.round(patch.maxLetterQty))
+      }
+
+      if (patch.applyProductTypeDefaults && productType) {
+        updates.productTypeId = productType.id
+        updates.maxLetterQty = productType.maxLetterQty
+        if (shippingType) {
+          updates.shipClass = shippingType.shipClass
+          updates.weightOz =
+            shippingType.shipClass === 'letter' ? 0.1 : shippingType.shipClass === 'parcel' ? 4 : 1
+          updates.thicknessIn =
+            shippingType.shipClass === 'letter' ? 0.02 : shippingType.shipClass === 'parcel' ? 2 : 0.5
+        }
+      }
+
+      await setDoc(doc(db, 'products', productId), updates, { merge: true })
+    }),
+  )
+
+  return { updated: ids.length }
 }
 
 export async function deleteAdminProduct(
@@ -383,6 +500,143 @@ export async function deleteAdminProduct(
   )
 
   return { ok: true }
+}
+
+export async function listAdminShippingTypes(): Promise<ShippingType[]> {
+  const snapshot = await getDocs(collection(db, 'shippingTypes'))
+  return snapshot.docs
+    .map((docSnap) => parseShippingType(docSnap.id, docSnap.data()))
+    .filter((item): item is ShippingType => item !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+}
+
+export async function saveAdminShippingType(input: Omit<ShippingType, 'active'> & { active?: boolean }): Promise<ShippingType> {
+  await ensureAdminFirestoreAccess()
+
+  const id = input.id.trim()
+  if (!id) throw new Error('Shipping type id is required')
+
+  const existingSnap = await getDoc(doc(db, 'shippingTypes', id))
+  const isNew = !existingSnap.exists()
+  let sortOrder = input.sortOrder
+  if (isNew && (!Number.isFinite(sortOrder) || sortOrder === 0)) {
+    const all = await listAdminShippingTypes()
+    const maxSort = all.reduce((max, type) => Math.max(max, type.sortOrder), 0)
+    sortOrder = maxSort + 1
+  }
+
+  const payload = {
+    name: input.name.trim(),
+    packageType: input.packageType,
+    postageMode: input.postageMode,
+    shipClass: input.shipClass,
+    baseRateCents: Math.max(0, Math.round(input.baseRateCents)),
+    freeAboveSubtotalCents: input.freeAboveSubtotalCents,
+    includedWeightOz: Math.max(0, input.includedWeightOz),
+    overweightCentsPerOz: Math.max(0, Math.round(input.overweightCentsPerOz)),
+    maxWeightOz: Math.max(0, input.maxWeightOz),
+    maxThicknessIn: Math.max(0, input.maxThicknessIn),
+    maxItems: Math.max(0, Math.round(input.maxItems)),
+    sortOrder,
+    active: input.active !== false,
+    updatedAt: serverTimestamp(),
+    ...(isNew ? { createdAt: serverTimestamp() } : {}),
+  }
+
+  await setDoc(doc(db, 'shippingTypes', id), payload, { merge: true })
+  const parsed = parseShippingType(id, payload)
+  if (!parsed) throw new Error('Could not save shipping type')
+  return parsed
+}
+
+export async function deleteAdminShippingType(id: string): Promise<void> {
+  await ensureAdminFirestoreAccess()
+  await deleteDoc(doc(db, 'shippingTypes', id))
+}
+
+export async function installDefaultShippingTypes(): Promise<ShippingType[]> {
+  const existing = await listAdminShippingTypes()
+  if (existing.length > 0) return existing
+
+  const created: ShippingType[] = []
+  for (const defaults of DEFAULT_SHIPPING_TYPES) {
+    const { id, ...rest } = defaults
+    created.push(await saveAdminShippingType({ id, ...rest }))
+  }
+  return created
+}
+
+export async function listAdminProductTypes(): Promise<ProductType[]> {
+  const snapshot = await getDocs(collection(db, 'productTypes'))
+  return snapshot.docs
+    .map((docSnap) => parseProductType(docSnap.id, docSnap.data()))
+    .filter((item): item is ProductType => item !== null)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+}
+
+export async function saveAdminProductType(input: ProductType): Promise<ProductType> {
+  await ensureAdminFirestoreAccess()
+
+  const id = input.id.trim()
+  if (!id) throw new Error('Product type id is required')
+
+  const existingSnap = await getDoc(doc(db, 'productTypes', id))
+  const isNew = !existingSnap.exists()
+  let sortOrder = input.sortOrder
+  if (isNew && (!Number.isFinite(sortOrder) || sortOrder === 0)) {
+    const all = await listAdminProductTypes()
+    const maxSort = all.reduce((max, type) => Math.max(max, type.sortOrder), 0)
+    sortOrder = maxSort + 1
+  }
+
+  const payload = {
+    name: input.name.trim(),
+    description: input.description.trim(),
+    defaultPriceCents: Math.max(0, Math.round(input.defaultPriceCents)),
+    shippingTypeId: input.shippingTypeId.trim(),
+    shipsAsLetter: input.shipsAsLetter === true,
+    maxLetterQty: Math.max(0, Math.round(input.maxLetterQty)),
+    sortOrder,
+    active: input.active !== false,
+    updatedAt: serverTimestamp(),
+    ...(isNew ? { createdAt: serverTimestamp() } : {}),
+  }
+
+  await setDoc(doc(db, 'productTypes', id), payload, { merge: true })
+  const parsed = parseProductType(id, payload)
+  if (!parsed) throw new Error('Could not save product type')
+  return parsed
+}
+
+export async function deleteAdminProductType(id: string): Promise<void> {
+  await ensureAdminFirestoreAccess()
+  await deleteDoc(doc(db, 'productTypes', id))
+
+  const productsSnap = await getDocs(collection(db, 'products'))
+  await Promise.all(
+    productsSnap.docs
+      .filter((productDoc) => productDoc.data().productTypeId === id)
+      .map((productDoc) =>
+        setDoc(
+          doc(db, 'products', productDoc.id),
+          { productTypeId: '', updatedAt: serverTimestamp() },
+          { merge: true },
+        ),
+      ),
+  )
+}
+
+export async function installDefaultProductTypes(): Promise<ProductType[]> {
+  const existing = await listAdminProductTypes()
+  if (existing.length > 0) return existing
+
+  await installDefaultShippingTypes()
+
+  const created: ProductType[] = []
+  for (const defaults of DEFAULT_PRODUCT_TYPES) {
+    created.push(await saveAdminProductType(defaults))
+  }
+  return created
 }
 
 export type AdminContactMessage = {
@@ -455,8 +709,247 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
       pages: settings.pages,
       siteOffline: settings.siteOffline,
       offlineMessage,
+      shoppingPaused: settings.shoppingPaused === true,
       updatedAt: serverTimestamp(),
     },
     { merge: true },
   )
+}
+
+export type AdminOrderItem = {
+  productId: string | null
+  name: string
+  quantity: number
+  unitAmountCents: number
+  amountCents: number
+  productTypeId: string
+  shipClass: 'letter' | 'soft_pack' | 'parcel'
+  weightOz: number | null
+  thicknessIn: number | null
+  maxLetterQty: number | null
+}
+
+export type AdminOrderAddress = {
+  name: string
+  phone: string
+  line1: string
+  line2: string
+  city: string
+  state: string
+  postalCode: string
+  country: string
+}
+
+export type AdminOrder = {
+  id: string
+  email: string | null
+  customerName: string | null
+  phone: string | null
+  userId: string | null
+  paymentStatus: string
+  amountTotal: number
+  items: AdminOrderItem[]
+  shippingAddress: AdminOrderAddress | null
+  shippingAmountCents: number
+  shippingRateName: string
+  fulfillmentStatus: 'unfulfilled' | 'fulfilled' | 'cancelled'
+  packageType: 'envelope' | 'bubble_mailer' | 'box'
+  postageMode: 'stamp' | 'label'
+  packagingSuggestion: {
+    packageType: string
+    postageMode: string
+    reason: string
+    weightOz: number
+  } | null
+  labelUrl: string | null
+  trackingNumber: string | null
+  trackingUrl: string | null
+  carrier: string | null
+  trackingStatus: string | null
+  trackingStatusDetail: string | null
+  createdAt: string | null
+  shippedAt: string | null
+  deliveredAt: string | null
+}
+
+function parseOrderAddress(data: unknown): AdminOrderAddress | null {
+  if (!data || typeof data !== 'object') return null
+  const record = data as Record<string, unknown>
+  return {
+    name: typeof record.name === 'string' ? record.name : '',
+    phone: typeof record.phone === 'string' ? record.phone : '',
+    line1: typeof record.line1 === 'string' ? record.line1 : '',
+    line2: typeof record.line2 === 'string' ? record.line2 : '',
+    city: typeof record.city === 'string' ? record.city : '',
+    state: typeof record.state === 'string' ? record.state : '',
+    postalCode: typeof record.postalCode === 'string' ? record.postalCode : '',
+    country: typeof record.country === 'string' ? record.country : '',
+  }
+}
+
+function parseAdminOrder(id: string, data: Record<string, unknown>): AdminOrder | null {
+  const itemsRaw = Array.isArray(data.items) ? data.items : []
+  const items: AdminOrderItem[] = itemsRaw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const record = item as Record<string, unknown>
+      return {
+        productId: typeof record.productId === 'string' ? record.productId : null,
+        name: typeof record.name === 'string' ? record.name : 'Item',
+        quantity: typeof record.quantity === 'number' ? record.quantity : 1,
+        unitAmountCents: typeof record.unitAmountCents === 'number' ? record.unitAmountCents : 0,
+        amountCents: typeof record.amountCents === 'number' ? record.amountCents : 0,
+        productTypeId: typeof record.productTypeId === 'string' ? record.productTypeId : '',
+        shipClass:
+          record.shipClass === 'letter' || record.shipClass === 'parcel' ? record.shipClass : 'soft_pack',
+        weightOz: typeof record.weightOz === 'number' ? record.weightOz : null,
+        thicknessIn: typeof record.thicknessIn === 'number' ? record.thicknessIn : null,
+        maxLetterQty: typeof record.maxLetterQty === 'number' ? record.maxLetterQty : null,
+      } satisfies AdminOrderItem
+    })
+    .filter((item): item is AdminOrderItem => item !== null)
+
+  const suggestion =
+    data.packagingSuggestion && typeof data.packagingSuggestion === 'object'
+      ? (data.packagingSuggestion as Record<string, unknown>)
+      : null
+
+  return {
+    id,
+    email: typeof data.email === 'string' ? data.email : null,
+    customerName: typeof data.customerName === 'string' ? data.customerName : null,
+    phone: typeof data.phone === 'string' ? data.phone : null,
+    userId: typeof data.userId === 'string' ? data.userId : null,
+    paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : 'unknown',
+    amountTotal: typeof data.amountTotal === 'number' ? data.amountTotal : 0,
+    items,
+    shippingAddress: parseOrderAddress(data.shippingAddress),
+    shippingAmountCents: typeof data.shippingAmountCents === 'number' ? data.shippingAmountCents : 0,
+    shippingRateName: typeof data.shippingRateName === 'string' ? data.shippingRateName : 'Shipping',
+    fulfillmentStatus:
+      data.fulfillmentStatus === 'fulfilled' || data.fulfillmentStatus === 'cancelled'
+        ? data.fulfillmentStatus
+        : 'unfulfilled',
+    packageType:
+      data.packageType === 'envelope' || data.packageType === 'box' ? data.packageType : 'bubble_mailer',
+    postageMode: data.postageMode === 'stamp' ? 'stamp' : 'label',
+    packagingSuggestion: suggestion
+      ? {
+          packageType: typeof suggestion.packageType === 'string' ? suggestion.packageType : 'bubble_mailer',
+          postageMode: typeof suggestion.postageMode === 'string' ? suggestion.postageMode : 'label',
+          reason: typeof suggestion.reason === 'string' ? suggestion.reason : '',
+          weightOz: typeof suggestion.weightOz === 'number' ? suggestion.weightOz : 1,
+        }
+      : null,
+    labelUrl: typeof data.labelUrl === 'string' ? data.labelUrl : null,
+    trackingNumber: typeof data.trackingNumber === 'string' ? data.trackingNumber : null,
+    trackingUrl: typeof data.trackingUrl === 'string' ? data.trackingUrl : null,
+    carrier: typeof data.carrier === 'string' ? data.carrier : null,
+    trackingStatus: typeof data.trackingStatus === 'string' ? data.trackingStatus : null,
+    trackingStatusDetail:
+      typeof data.trackingStatusDetail === 'string' ? data.trackingStatusDetail : null,
+    createdAt: timestampToIso(data.createdAt),
+    shippedAt: timestampToIso(data.shippedAt),
+    deliveredAt: timestampToIso(data.deliveredAt),
+  }
+}
+
+export async function listAdminOrders(): Promise<AdminOrder[]> {
+  const data = await adminFetch<{ orders: Record<string, unknown>[] }>('/api/admin/orders', {
+    method: 'GET',
+  })
+
+  return (data.orders || [])
+    .map((order) => {
+      const id = typeof order.id === 'string' ? order.id : ''
+      if (!id) return null
+      return parseAdminOrder(id, order)
+    })
+    .filter((order): order is AdminOrder => order !== null)
+}
+
+export async function markOrderFulfilledWithStamp(
+  orderId: string,
+  packageType: 'envelope' | 'bubble_mailer' | 'box' = 'envelope',
+): Promise<void> {
+  await ensureAdminFirestoreAccess()
+  await setDoc(
+    doc(db, 'orders', orderId),
+    {
+      fulfillmentStatus: 'fulfilled',
+      postageMode: 'stamp',
+      packageType,
+      shippedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+}
+
+/** Clear label/tracking so you can buy a new (e.g. live) Shippo label. */
+export async function resetOrderFulfillment(orderId: string): Promise<void> {
+  await ensureAdminFirestoreAccess()
+  await setDoc(
+    doc(db, 'orders', orderId),
+    {
+      fulfillmentStatus: 'unfulfilled',
+      labelUrl: deleteField(),
+      trackingNumber: deleteField(),
+      trackingUrl: deleteField(),
+      carrier: deleteField(),
+      shippoTransactionId: deleteField(),
+      trackingStatus: deleteField(),
+      trackingStatusDetail: deleteField(),
+      trackingUpdatedAt: deleteField(),
+      shippedAt: deleteField(),
+      deliveredAt: deleteField(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+}
+
+export async function getAdminOrderRates(
+  orderId: string,
+  packageType?: 'envelope' | 'bubble_mailer' | 'box',
+): Promise<{
+  postageMode: string
+  packaging: { packageType: string; postageMode: string; reason?: string; weightOz: number }
+  rates: Array<{
+    objectId: string
+    provider: string
+    service: string
+    amount: string
+    currency: string
+    estimatedDays: number | null
+  }>
+  recommendedRateId: string | null
+  message?: string
+}> {
+  return adminFetch('/api/admin/orders/rates', {
+    method: 'POST',
+    body: JSON.stringify({ orderId, packageType }),
+  })
+}
+
+export async function purchaseAdminOrderLabel(
+  orderId: string,
+  options: { rateId?: string; packageType?: 'envelope' | 'bubble_mailer' | 'box' } = {},
+): Promise<{
+  ok: boolean
+  labelUrl: string | null
+  trackingNumber: string | null
+  trackingUrl: string | null
+  carrier: string | null
+  emailSent?: boolean
+  emailNote?: string | null
+}> {
+  return adminFetch('/api/admin/orders/label', {
+    method: 'POST',
+    body: JSON.stringify({
+      orderId,
+      rateId: options.rateId,
+      packageType: options.packageType,
+    }),
+  })
 }

@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import PageSheet from '../components/PageSheet'
 import { GuestCheckoutGate, GuestRewardsPrompt } from '../components/RewardsPrompt'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { useShopPause } from '../context/ShopPauseContext'
 import { formatPrice, getProductCover } from '../data/products'
-import { createCheckoutSession } from '../lib/checkout'
-import { getOptionalAuthToken, getRewardsSummary, type RewardsSummary } from '../lib/rewardsApi'
+import { getRewardsSummary, type RewardsSummary } from '../lib/rewardsApi'
 
 export default function Cart() {
   const { user } = useAuth()
   const { lines, subtotalCents, updateQuantity, removeItem } = useCart()
+  const { shoppingPaused, showPausedModal } = useShopPause()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rewards, setRewards] = useState<RewardsSummary | null>(null)
@@ -37,52 +39,48 @@ export default function Cart() {
       }
     }
 
-    loadRewards()
+    void loadRewards()
 
     return () => {
       ignore = true
     }
   }, [user])
 
-  async function proceedToCheckout() {
-    setLoading(true)
+  function goToCheckout() {
     setError(null)
 
-    try {
-      const missingStripe = lines.find((line) => !line.product.stripePriceId)
-      if (missingStripe) {
-        throw new Error(`${missingStripe.product.name} is not available for checkout yet.`)
-      }
-
-      const authToken = await getOptionalAuthToken()
-      const url = await createCheckoutSession(
-        lines.map((line) => ({
-          stripePriceId: line.product.stripePriceId!,
-          quantity: line.quantity,
-        })),
-        {
-          authToken,
-          rewardId: promoCode.trim() ? undefined : selectedRewardId || undefined,
-          promotionCode: promoCode.trim() || undefined,
-        },
-      )
-      window.location.href = url
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Checkout failed')
-      setLoading(false)
+    const missingStripe = lines.find((line) => !line.product.stripePriceId)
+    if (missingStripe) {
+      setError(`${missingStripe.product.name} is not available for checkout yet.`)
       setGuestGateOpen(false)
+      return
     }
+
+    setLoading(true)
+    navigate('/checkout', {
+      state: {
+        promotionCode: promoCode.trim() || undefined,
+        rewardId: promoCode.trim() ? undefined : selectedRewardId || undefined,
+      },
+    })
+    setLoading(false)
+    setGuestGateOpen(false)
   }
 
   function handleCheckoutClick() {
     setError(null)
+
+    if (shoppingPaused) {
+      showPausedModal()
+      return
+    }
 
     if (!user) {
       setGuestGateOpen(true)
       return
     }
 
-    void proceedToCheckout()
+    goToCheckout()
   }
 
   if (lines.length === 0) {
@@ -91,12 +89,12 @@ export default function Cart() {
         <PageHeader title="Shopping cart" subtitle="Your cart is empty." />
 
         <PageSheet>
-        <div className="cart-empty">
-          <p>No items in your cart yet.</p>
-          <Link to="/store" className="btn btn-primary">
-            Continue shopping
-          </Link>
-        </div>
+          <div className="cart-empty">
+            <p>No items in your cart yet.</p>
+            <Link to="/store" className="btn btn-primary">
+              Continue shopping
+            </Link>
+          </div>
         </PageSheet>
       </div>
     )
@@ -189,7 +187,14 @@ export default function Cart() {
               <span>Subtotal</span>
               <strong>{formatPrice(subtotalCents)}</strong>
             </div>
-            <p className="cart-summary-note">Tax and shipping calculated at Stripe checkout.</p>
+            <div className="cart-summary-row">
+              <span>Shipping</span>
+              <strong>Live at checkout</strong>
+            </div>
+            <p className="cart-summary-note">
+              Address and Shippo rates are collected on the next screen (Untracked letter when eligible,
+              or Bubble mailer).
+            </p>
           </div>
 
           <div className="cart-summary-section">
@@ -233,7 +238,9 @@ export default function Cart() {
                   <span>
                     Apply{' '}
                     <strong>{selectedReward?.code ?? rewards.activeRewards[0]?.code}</strong> (
-                    {formatPrice(selectedReward?.discountCents ?? rewards.activeRewards[0]?.discountCents ?? 0)}{' '}
+                    {formatPrice(
+                      selectedReward?.discountCents ?? rewards.activeRewards[0]?.discountCents ?? 0,
+                    )}{' '}
                     off)
                   </span>
                 </label>
@@ -256,7 +263,7 @@ export default function Cart() {
             disabled={loading}
             onClick={handleCheckoutClick}
           >
-            {loading ? 'Redirecting…' : 'Checkout'}
+            {loading ? 'Opening…' : 'Checkout'}
           </button>
         </aside>
       </div>
@@ -265,7 +272,7 @@ export default function Cart() {
         open={guestGateOpen}
         loading={loading}
         onClose={() => setGuestGateOpen(false)}
-        onContinue={() => void proceedToCheckout()}
+        onContinue={() => goToCheckout()}
       />
     </div>
   )

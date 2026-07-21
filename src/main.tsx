@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { CartProvider } from './context/CartContext'
+import { ShopPauseProvider } from './context/ShopPauseContext'
 import './index.css'
 import './craft-theme.css'
 import './pages-art.css'
@@ -12,9 +13,11 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <CartProvider>
-          <App />
-        </CartProvider>
+        <ShopPauseProvider>
+          <CartProvider>
+            <App />
+          </CartProvider>
+        </ShopPauseProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

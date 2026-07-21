@@ -8,6 +8,7 @@ export type SiteSettings = {
   pages: Record<SitePageId, boolean>
   siteOffline: boolean
   offlineMessage: string
+  shoppingPaused: boolean
 }
 
 export const SITE_NAV_PAGES: {
@@ -34,6 +35,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   },
   siteOffline: false,
   offlineMessage: DEFAULT_OFFLINE_MESSAGE,
+  shoppingPaused: false,
 }
 
 export const SITE_SETTINGS_DOC = 'siteSettings/public'
@@ -56,6 +58,7 @@ export function parseSiteSettings(data: Record<string, unknown> | undefined): Si
       typeof data?.offlineMessage === 'string' && data.offlineMessage.trim() ?
         data.offlineMessage.trim()
       : DEFAULT_OFFLINE_MESSAGE,
+    shoppingPaused: data?.shoppingPaused === true,
   }
 }
 

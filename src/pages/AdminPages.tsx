@@ -15,6 +15,7 @@ function toForm(settings: SiteSettings): PageForm {
     pages: { ...settings.pages },
     siteOffline: settings.siteOffline,
     offlineMessage: settings.offlineMessage,
+    shoppingPaused: settings.shoppingPaused,
   }
 }
 
@@ -106,6 +107,32 @@ export default function AdminPages() {
                 </li>
               ))}
             </ul>
+          </div>
+
+          <div className="admin-card">
+            <div className="admin-card-header">
+              <div>
+                <h2>Pause shopping</h2>
+                <p>
+                  Visitors can still browse the store and product pages, but adding to cart is blocked
+                  and they see an under-construction message.
+                </p>
+              </div>
+            </div>
+
+            <label className="admin-toggle">
+              <input
+                type="checkbox"
+                checked={form.shoppingPaused}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, shoppingPaused: event.target.checked }))
+                }
+              />
+              <span>
+                <strong>Pause orders &amp; shopping</strong>
+                <small>Shows a modal on first visit and when someone tries to add to cart.</small>
+              </span>
+            </label>
           </div>
 
           <div className="admin-card">

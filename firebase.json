@@ -4,9 +4,30 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
+        "source": "/api/shipping/quote",
+        "function": {
+          "functionId": "quoteCheckoutShipping",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/shippo/webhook",
+        "function": {
+          "functionId": "shippoWebhook",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "/api/create-checkout-session",
         "function": {
           "functionId": "createCheckoutSession",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/checkout/shipping",
+        "function": {
+          "functionId": "updateCheckoutShipping",
           "region": "us-central1"
         }
       },
@@ -63,6 +84,27 @@
         "source": "/api/admin/media/read",
         "function": {
           "functionId": "adminReadMedia",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/orders/rates",
+        "function": {
+          "functionId": "adminOrderRates",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/orders/label",
+        "function": {
+          "functionId": "adminOrderLabel",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/admin/orders",
+        "function": {
+          "functionId": "adminListOrders",
           "region": "us-central1"
         }
       },

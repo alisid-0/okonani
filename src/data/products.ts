@@ -31,6 +31,11 @@ export type Product = {
   category?: string
   stripePriceId?: string
   media: ProductMedia[]
+  productTypeId?: string
+  shipClass?: 'letter' | 'soft_pack' | 'parcel'
+  weightOz?: number
+  thicknessIn?: number
+  maxLetterQty?: number
 }
 
 export function formatPrice(priceInCents: number): string {
@@ -109,6 +114,14 @@ export function parseProduct(id: string, data: Record<string, unknown>): Product
     category: typeof data.category === 'string' ? data.category : '',
     stripePriceId: typeof data.stripePriceId === 'string' ? data.stripePriceId : undefined,
     media: parseMedia(data.media),
+    productTypeId: typeof data.productTypeId === 'string' ? data.productTypeId : undefined,
+    shipClass:
+      data.shipClass === 'letter' || data.shipClass === 'soft_pack' || data.shipClass === 'parcel'
+        ? data.shipClass
+        : 'soft_pack',
+    weightOz: typeof data.weightOz === 'number' ? data.weightOz : undefined,
+    thicknessIn: typeof data.thicknessIn === 'number' ? data.thicknessIn : undefined,
+    maxLetterQty: typeof data.maxLetterQty === 'number' ? data.maxLetterQty : undefined,
   }
 }
 

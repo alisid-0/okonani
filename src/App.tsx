@@ -10,6 +10,7 @@ const Account = lazy(() => import('./pages/Account'))
 const Admin = lazy(() => import('./pages/Admin'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const Cart = lazy(() => import('./pages/Cart'))
+const Checkout = lazy(() => import('./pages/Checkout'))
 const Contact = lazy(() => import('./pages/Contact'))
 const CheckoutCancel = lazy(() => import('./pages/CheckoutCancel'))
 const CheckoutSuccess = lazy(() => import('./pages/CheckoutSuccess'))
@@ -76,6 +77,9 @@ export default function App() {
           <Route path="checkout/success" element={<CheckoutSuccess />} />
           <Route path="checkout/cancel" element={<CheckoutCancel />} />
         </Route>
+
+        {/* Full-page checkout — outside site Layout so it isn’t a widget in the notebook chrome */}
+        <Route path="checkout" element={<Checkout />} />
 
         <Route path="admin/login" element={<AdminLogin />} />
         <Route element={<AdminRoute />}>
