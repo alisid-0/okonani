@@ -9,11 +9,27 @@ import {
 } from './productOptions'
 
 export type ProductMedia = {
+  /** Stable id for gallery linking from option choices; assigned on parse if missing. */
+  id: string
   url: string
   type: 'image' | 'video'
   alt?: string
   /** Admin-only: uncropped original kept for re-cropping; not shown on the storefront */
   sourceUrl?: string
+}
+
+export function createMediaId(): string {
+  return `media-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** Stable id when legacy media has none — same URL → same id across loads until saved. */
+export function mediaIdForUrl(url: string): string {
+  let hash = 2166136261
+  for (let i = 0; i < url.length; i += 1) {
+    hash ^= url.charCodeAt(i)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `media-${(hash >>> 0).toString(36)}`
 }
 
 export type ProductReview = {
@@ -111,7 +127,7 @@ function parseMedia(data: unknown): ProductMedia[] {
   for (const item of data) {
     if (typeof item === 'string') {
       const url = item.trim()
-      if (url) media.push({ url, type: 'image' })
+      if (url) media.push({ id: mediaIdForUrl(url), url, type: 'image' })
       continue
     }
 
@@ -123,7 +139,9 @@ function parseMedia(data: unknown): ProductMedia[] {
 
     if (!url || !type) continue
 
-    const parsed: ProductMedia = { url, type }
+    const id =
+      typeof record.id === 'string' && record.id.trim() ? record.id.trim() : mediaIdForUrl(url)
+    const parsed: ProductMedia = { id, url, type }
     if (typeof record.alt === 'string' && record.alt.trim()) parsed.alt = record.alt.trim()
     if (typeof record.sourceUrl === 'string' && record.sourceUrl.trim()) {
       parsed.sourceUrl = record.sourceUrl.trim()
@@ -133,6 +151,12 @@ function parseMedia(data: unknown): ProductMedia[] {
   }
 
   return media
+}
+
+/** Index of media by id among non-empty urls, or -1 if not found. */
+export function indexOfMediaId(media: ProductMedia[], mediaId: string | undefined | null): number {
+  if (!mediaId) return -1
+  return media.filter((item) => item.url.trim()).findIndex((item) => item.id === mediaId)
 }
 
 function timestampToIso(value: unknown): string | null {

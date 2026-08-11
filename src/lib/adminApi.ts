@@ -46,6 +46,7 @@ function serializeMedia(media: ProductMedia[]): ProductMedia[] {
     .filter((item) => item.url.trim())
     .map((item) => {
       const next: ProductMedia = {
+        id: item.id?.trim() || `media-${Math.random().toString(36).slice(2, 10)}`,
         url: item.url.trim(),
         type: item.type === 'video' ? 'video' : 'image',
       }
@@ -735,6 +736,10 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
   await ensureAdminFirestoreAccess()
 
   const offlineMessage = settings.offlineMessage.trim() || DEFAULT_SITE_SETTINGS.offlineMessage
+  const shoppingPausedTitle =
+    settings.shoppingPausedTitle.trim() || DEFAULT_SITE_SETTINGS.shoppingPausedTitle
+  const shoppingPausedMessage =
+    settings.shoppingPausedMessage.trim() || DEFAULT_SITE_SETTINGS.shoppingPausedMessage
   const home = settings.home ?? DEFAULT_SITE_SETTINGS.home
 
   await setDoc(
@@ -744,6 +749,8 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
       siteOffline: settings.siteOffline,
       offlineMessage,
       shoppingPaused: settings.shoppingPaused === true,
+      shoppingPausedTitle,
+      shoppingPausedMessage,
       home: {
         collectionsEnabled: home.collectionsEnabled === true,
         collectionsTitle: home.collectionsTitle.trim() || DEFAULT_SITE_SETTINGS.home.collectionsTitle,

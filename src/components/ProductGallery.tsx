@@ -5,6 +5,9 @@ import ProtectedImage from './ProtectedImage'
 type ProductGalleryProps = {
   media: ProductMedia[]
   productName: string
+  /** Controlled active slide index (among non-empty media items). */
+  activeIndex?: number
+  onActiveIndexChange?: (index: number) => void
 }
 
 function isYoutubeUrl(url: string): boolean {
@@ -20,20 +23,36 @@ function youtubeEmbedUrl(url: string): string | null {
   return match?.[1] ? `https://www.youtube.com/embed/${match[1]}` : null
 }
 
-export default function ProductGallery({ media, productName }: ProductGalleryProps) {
+export default function ProductGallery({
+  media,
+  productName,
+  activeIndex: controlledIndex,
+  onActiveIndexChange,
+}: ProductGalleryProps) {
   const items = media.filter((item) => item.url.trim())
-  const [activeIndex, setActiveIndex] = useState(0)
+  const isControlled = controlledIndex !== undefined
+  const [internalIndex, setInternalIndex] = useState(0)
+  const activeIndex = isControlled ? controlledIndex : internalIndex
+
+  function setActiveIndex(next: number | ((prev: number) => number)) {
+    const resolved = typeof next === 'function' ? next(activeIndex) : next
+    const clamped = Math.max(0, Math.min(resolved, Math.max(0, items.length - 1)))
+    if (!isControlled) setInternalIndex(clamped)
+    onActiveIndexChange?.(clamped)
+  }
+
   const activeItem = items[activeIndex] ?? items[0]
   const hasMultiple = items.length > 1
 
   useEffect(() => {
-    setActiveIndex(0)
-  }, [media])
+    if (!isControlled) setInternalIndex(0)
+  }, [media, isControlled])
 
   useEffect(() => {
     if (activeIndex > items.length - 1) {
       setActiveIndex(Math.max(0, items.length - 1))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clamp only when length shrinks
   }, [activeIndex, items.length])
 
   function showPrevious() {
@@ -111,7 +130,7 @@ export default function ProductGallery({ media, productName }: ProductGalleryPro
         <div className="product-gallery-thumbs" role="tablist" aria-label={`${productName} media`}>
           {items.map((item, index) => (
             <button
-              key={`${item.url}-${index}`}
+              key={item.id || `${item.url}-${index}`}
               type="button"
               role="tab"
               aria-selected={index === activeIndex}

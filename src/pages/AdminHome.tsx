@@ -34,7 +34,12 @@ export default function AdminHome() {
   const [home, setHome] = useState<HomeLayoutSettings>({ ...DEFAULT_HOME_LAYOUT })
   const [pagesSnapshot, setPagesSnapshot] = useState<Pick<
     SiteSettings,
-    'pages' | 'siteOffline' | 'offlineMessage' | 'shoppingPaused'
+    | 'pages'
+    | 'siteOffline'
+    | 'offlineMessage'
+    | 'shoppingPaused'
+    | 'shoppingPausedTitle'
+    | 'shoppingPausedMessage'
   > | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -56,6 +61,8 @@ export default function AdminHome() {
         siteOffline: settings.siteOffline,
         offlineMessage: settings.offlineMessage,
         shoppingPaused: settings.shoppingPaused,
+        shoppingPausedTitle: settings.shoppingPausedTitle,
+        shoppingPausedMessage: settings.shoppingPausedMessage,
       })
       setHome({ ...DEFAULT_HOME_LAYOUT, ...settings.home })
       setCategories(
@@ -147,6 +154,8 @@ export default function AdminHome() {
         siteOffline: DEFAULT_SITE_SETTINGS.siteOffline,
         offlineMessage: DEFAULT_SITE_SETTINGS.offlineMessage,
         shoppingPaused: DEFAULT_SITE_SETTINGS.shoppingPaused,
+        shoppingPausedTitle: DEFAULT_SITE_SETTINGS.shoppingPausedTitle,
+        shoppingPausedMessage: DEFAULT_SITE_SETTINGS.shoppingPausedMessage,
       }
 
       await Promise.all(

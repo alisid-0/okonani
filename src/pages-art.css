@@ -56,6 +56,13 @@
   max-width: 38rem;
 }
 
+.notebook-page.page-narrow,
+.scrapbook-page.page-narrow {
+  max-width: 38rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
 /* Notebook inner pages — Store, About, Contact, etc. */
 
 .notebook-page,
@@ -700,10 +707,14 @@
 
 /* Forms & account */
 
-.page-contact .page-sheet {
+.page-contact .page-sheet,
+.page-contact .content-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  width: 100%;
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .page-contact .contact-form,

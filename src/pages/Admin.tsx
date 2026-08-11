@@ -3,7 +3,7 @@ import { collection, doc } from 'firebase/firestore'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../data/categories'
-import { getProductCover, formatPrice, type ProductMedia } from '../data/products'
+import { getProductCover, formatPrice, createMediaId, type ProductMedia } from '../data/products'
 import {
   batchUpdateAdminProducts,
   deleteAdminProduct,
@@ -18,9 +18,14 @@ import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
 import ImageCropModal from '../components/ImageCropModal'
 import ProductOptionsEditorModal from '../components/ProductOptionsEditorModal'
+import ProductShopperPreviewModal from '../components/ProductShopperPreviewModal'
 import SortableList from '../components/SortableList'
 import type { ProductType } from '../data/productTypes'
-import type { ProductOptionGroup, ProductOptionsMode } from '../data/productOptions'
+import {
+  resolveProductOptionGroups,
+  type ProductOptionGroup,
+  type ProductOptionsMode,
+} from '../data/productOptions'
 import type { ShippingType } from '../data/shippingTypes'
 import AdminCategories from './AdminCategories'
 import AdminHome from './AdminHome'
@@ -96,7 +101,7 @@ function createProductId(): string {
 }
 
 function newMediaItem(type: ProductMedia['type'] = 'image'): ProductMedia {
-  return { url: '', type, alt: '' }
+  return { id: createMediaId(), url: '', type, alt: '' }
 }
 
 export default function Admin() {
@@ -147,6 +152,7 @@ export default function Admin() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [optionsOpen, setOptionsOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const draftProductIdRef = useRef('')
 
   async function loadProducts(selectId?: string) {
@@ -583,8 +589,21 @@ export default function Admin() {
         title={form.name ? `Options for ${form.name}` : 'Product options'}
         groups={form.optionGroups}
         uploadKey={`_option-images/products/${form.id || 'new'}`}
+        productMedia={form.media}
         onClose={() => setOptionsOpen(false)}
         onSave={(optionGroups) => setForm((prev) => ({ ...prev, optionGroups }))}
+      />
+      <ProductShopperPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        productName={form.name}
+        basePriceCents={dollarsToCents(form.price) || 0}
+        description={form.description}
+        media={form.media}
+        groups={resolveProductOptionGroups(
+          { optionsMode: form.optionsMode, optionGroups: form.optionGroups },
+          productTypes.find((type) => type.id === form.productTypeId),
+        )}
       />
       <aside className="admin-sidebar">
         <div className="admin-sidebar-top">
@@ -1034,7 +1053,8 @@ export default function Admin() {
                   <h2>Options</h2>
                   <p className="admin-field-hint">
                     Inherit option types from the product type, customize for this product, or turn
-                    options off. Edit choices and images in the options popup.
+                    options off. Edit choices in the options popup. Preview shows the shopper product
+                    page flow, including tapping option tiles.
                   </p>
                   <label>
                     Options source
@@ -1081,8 +1101,13 @@ export default function Admin() {
                           ).map((group) => (
                             <li key={group.id}>
                               <strong>{group.name}</strong>
+                              {group.active === false ? ' · off' : ''}
                               {group.required ? ' (required)' : ' (optional)'}:{' '}
-                              {group.choices.map((choice) => choice.label).join(', ')}
+                              {group.choices
+                                .map((choice) =>
+                                  `${choice.label}${choice.active === false ? ' (off)' : ''}`,
+                                )
+                                .join(', ')}
                             </li>
                           ))}
                         </ul>
@@ -1099,24 +1124,41 @@ export default function Admin() {
                             .map((group) => (
                               <li key={group.id}>
                                 <strong>{group.name}</strong>
+                                {group.active === false ? ' · off' : ''}
                                 {group.required ? ' (required)' : ' (optional)'}:{' '}
-                                {group.choices.map((choice) => choice.label).filter(Boolean).join(', ') ||
-                                  'no choices yet'}
+                                {group.choices
+                                  .map((choice) =>
+                                    `${choice.label || '…'}${choice.active === false ? ' (off)' : ''}`,
+                                  )
+                                  .join(', ') || 'no choices yet'}
                               </li>
                             ))}
                         </ul>
                       : (
                         <p className="admin-field-hint">No custom options yet.</p>
                       )}
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setOptionsOpen(true)}
-                      >
-                        Edit options
-                      </button>
+                      <div className="admin-options-actions">
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setOptionsOpen(true)}
+                        >
+                          Edit options
+                        </button>
+                      </div>
                     </>
                   )}
+
+                  <div className="admin-options-actions">
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setPreviewOpen(true)}
+                      disabled={!form.name.trim()}
+                    >
+                      Preview shopper view
+                    </button>
+                  </div>
                 </div>
 
                 {form.id && (

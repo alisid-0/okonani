@@ -23,6 +23,8 @@ export type SiteSettings = {
   siteOffline: boolean
   offlineMessage: string
   shoppingPaused: boolean
+  shoppingPausedTitle: string
+  shoppingPausedMessage: string
   home: HomeLayoutSettings
 }
 
@@ -41,6 +43,11 @@ export const SITE_NAV_PAGES: {
 export const DEFAULT_OFFLINE_MESSAGE =
   'Please check my socials for an update on when my site is live again!'
 
+export const DEFAULT_SHOP_PAUSED_TITLE = 'Shop Under Construction'
+
+export const DEFAULT_SHOP_PAUSED_MESSAGE =
+  'Feel free to browse the site while we work on the shop. We will be up soon!'
+
 export const DEFAULT_HOME_LAYOUT: HomeLayoutSettings = {
   collectionsEnabled: false,
   collectionsTitle: 'Shop by collection',
@@ -58,6 +65,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   siteOffline: false,
   offlineMessage: DEFAULT_OFFLINE_MESSAGE,
   shoppingPaused: false,
+  shoppingPausedTitle: DEFAULT_SHOP_PAUSED_TITLE,
+  shoppingPausedMessage: DEFAULT_SHOP_PAUSED_MESSAGE,
   home: { ...DEFAULT_HOME_LAYOUT },
 }
 
@@ -120,6 +129,14 @@ export function parseSiteSettings(data: Record<string, unknown> | undefined): Si
         data.offlineMessage.trim()
       : DEFAULT_OFFLINE_MESSAGE,
     shoppingPaused: data?.shoppingPaused === true,
+    shoppingPausedTitle:
+      typeof data?.shoppingPausedTitle === 'string' && data.shoppingPausedTitle.trim()
+        ? data.shoppingPausedTitle.trim()
+        : DEFAULT_SHOP_PAUSED_TITLE,
+    shoppingPausedMessage:
+      typeof data?.shoppingPausedMessage === 'string' && data.shoppingPausedMessage.trim()
+        ? data.shoppingPausedMessage.trim()
+        : DEFAULT_SHOP_PAUSED_MESSAGE,
     home: parseHomeLayout(data?.home),
   }
 }

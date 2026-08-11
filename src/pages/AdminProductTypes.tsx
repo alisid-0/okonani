@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import ProductOptionsEditorModal from '../components/ProductOptionsEditorModal'
+import ProductShopperPreviewModal from '../components/ProductShopperPreviewModal'
 import { formatPrice } from '../data/products'
 import type { ProductOptionGroup } from '../data/productOptions'
 import type { ProductType } from '../data/productTypes'
@@ -64,6 +65,7 @@ export default function AdminProductTypes() {
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [optionsOpen, setOptionsOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const isEditingExisting = Boolean(form.id && types.some((type) => type.id === form.id))
   const optionCount = form.optionGroups.filter((group) => group.name.trim()).length
@@ -369,20 +371,35 @@ export default function AdminProductTypes() {
                   .map((group) => (
                     <li key={group.id}>
                       <strong>{group.name}</strong>
+                      {group.active === false ? ' · off' : ''}
                       {group.required ? ' (required)' : ' (optional)'}:{' '}
-                      {group.choices.map((choice) => choice.label).filter(Boolean).join(', ') ||
-                        'no choices yet'}
+                      {group.choices
+                        .map(
+                          (choice) =>
+                            `${choice.label || '…'}${choice.active === false ? ' (off)' : ''}`,
+                        )
+                        .join(', ') || 'no choices yet'}
                     </li>
                   ))}
               </ul>
             )}
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => setOptionsOpen(true)}
-            >
-              {optionCount > 0 ? 'Edit options' : 'Add options'}
-            </button>
+            <div className="admin-options-actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setOptionsOpen(true)}
+              >
+                {optionCount > 0 ? 'Edit options' : 'Add options'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setPreviewOpen(true)}
+                disabled={!form.name.trim()}
+              >
+                Preview shopper view
+              </button>
+            </div>
           </section>
 
           <div className="admin-product-types-actions">
@@ -415,6 +432,17 @@ export default function AdminProductTypes() {
         uploadKey={`_option-images/types/${form.id || 'new'}`}
         onClose={() => setOptionsOpen(false)}
         onSave={(optionGroups) => setForm((prev) => ({ ...prev, optionGroups }))}
+      />
+      <ProductShopperPreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        productName={`Sample ${form.name || 'product'}`}
+        basePriceCents={dollarsToCents(form.defaultPrice) || 0}
+        description={
+          form.description.trim() ||
+          'Preview of how option tiles appear when a product inherits this type.'
+        }
+        groups={form.optionGroups}
       />
     </div>
   )

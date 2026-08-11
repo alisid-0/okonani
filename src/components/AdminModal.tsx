@@ -8,6 +8,8 @@ type AdminModalProps = {
   children: ReactNode
   footer?: ReactNode
   wide?: boolean
+  /** Extra-wide dialog for shopper previews */
+  preview?: boolean
 }
 
 export default function AdminModal({
@@ -18,6 +20,7 @@ export default function AdminModal({
   children,
   footer,
   wide = false,
+  preview = false,
 }: AdminModalProps) {
   useEffect(() => {
     if (!open) return
@@ -40,7 +43,7 @@ export default function AdminModal({
   return (
     <div className="admin-modal-backdrop" role="presentation" onClick={onClose}>
       <div
-        className={`admin-modal ${wide ? 'is-wide' : ''}`}
+        className={`admin-modal ${wide ? 'is-wide' : ''} ${preview ? 'is-preview' : ''}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-modal-title"

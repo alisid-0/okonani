@@ -8,7 +8,11 @@ import {
   type ReactNode,
 } from 'react'
 import { useLocation } from 'react-router-dom'
-import { useSiteSettings } from '../data/siteSettings'
+import {
+  DEFAULT_SHOP_PAUSED_MESSAGE,
+  DEFAULT_SHOP_PAUSED_TITLE,
+  useSiteSettings,
+} from '../data/siteSettings'
 
 const SESSION_KEY = 'okonani-shop-paused-modal-seen'
 
@@ -19,7 +23,17 @@ type ShopPauseContextValue = {
 
 const ShopPauseContext = createContext<ShopPauseContextValue | null>(null)
 
-export function ShopPausedModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function ShopPausedModal({
+  open,
+  onClose,
+  title,
+  message,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  message: string
+}) {
   if (!open) return null
 
   return (
@@ -30,8 +44,8 @@ export function ShopPausedModal({ open, onClose }: { open: boolean; onClose: () 
       aria-labelledby="shop-paused-title"
     >
       <div className="shop-paused-modal-panel">
-        <h2 id="shop-paused-title">Shop Under Construction</h2>
-        <p>Feel free to browse the site while we work on the shop. We will be up soon!</p>
+        <h2 id="shop-paused-title">{title || DEFAULT_SHOP_PAUSED_TITLE}</h2>
+        <p>{message || DEFAULT_SHOP_PAUSED_MESSAGE}</p>
         <button type="button" className="btn btn-primary" onClick={onClose}>
           OK
         </button>
@@ -85,7 +99,12 @@ export function ShopPauseProvider({ children }: { children: ReactNode }) {
     <ShopPauseContext.Provider value={value}>
       {children}
       {!isAdminRoute && (
-        <ShopPausedModal open={modalOpen} onClose={() => setModalOpen(false)} />
+        <ShopPausedModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title={settings.shoppingPausedTitle}
+          message={settings.shoppingPausedMessage}
+        />
       )}
     </ShopPauseContext.Provider>
   )

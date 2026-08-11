@@ -18,7 +18,6 @@ const {
   resendApiKeySecret,
   mailFromSecret,
   orderNotifyEmailSecret,
-  clientUrlSecret,
 } = require('./env')
 const { syncProductToStripe } = require('./stripeSync')
 const {
@@ -991,7 +990,6 @@ exports.stripeWebhook = onRequest(
       resendApiKeySecret,
       mailFromSecret,
       orderNotifyEmailSecret,
-      clientUrlSecret,
       adminEmailsSecret,
     ],
   },

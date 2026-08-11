@@ -5,6 +5,12 @@ export type ProductOptionChoice = {
   priceDeltaCents: number
   /** Optional image shown on the option picker for this choice. */
   imageUrl: string
+  /** Product media.id to jump the product gallery to when this choice is selected. */
+  linkedMediaId?: string
+  /** When true, do not show imageUrl on option tiles (gallery link can still apply). */
+  hideImageInOptions?: boolean
+  /** When false, hidden from shoppers but kept in admin for later. Default true. */
+  active?: boolean
 }
 
 export type ProductOptionGroup = {
@@ -12,6 +18,8 @@ export type ProductOptionGroup = {
   name: string
   required: boolean
   choices: ProductOptionChoice[]
+  /** When false, entire option type is hidden from shoppers. Default true. */
+  active?: boolean
 }
 
 /** How a product resolves its option groups relative to its product type. */
@@ -39,7 +47,15 @@ export function createOptionId(prefix = 'opt'): string {
 }
 
 export function emptyOptionChoice(): ProductOptionChoice {
-  return { id: createOptionId('choice'), label: '', priceDeltaCents: 0, imageUrl: '' }
+  return {
+    id: createOptionId('choice'),
+    label: '',
+    priceDeltaCents: 0,
+    imageUrl: '',
+    linkedMediaId: undefined,
+    hideImageInOptions: false,
+    active: true,
+  }
 }
 
 export function emptyOptionGroup(): ProductOptionGroup {
@@ -47,6 +63,7 @@ export function emptyOptionGroup(): ProductOptionGroup {
     id: createOptionId('group'),
     name: '',
     required: true,
+    active: true,
     choices: [emptyOptionChoice(), emptyOptionChoice()],
   }
 }
@@ -76,15 +93,24 @@ export function parseOptionGroups(data: unknown): ProductOptionGroup[] {
           ? choiceRecord.id.trim()
           : slugify(label) || createOptionId('choice')
 
+      const linkedMediaId =
+        typeof choiceRecord.linkedMediaId === 'string' && choiceRecord.linkedMediaId.trim()
+          ? choiceRecord.linkedMediaId.trim()
+          : undefined
+
       choices.push({
         id,
         label,
         priceDeltaCents: Math.round(Number(choiceRecord.priceDeltaCents) || 0),
         imageUrl:
           typeof choiceRecord.imageUrl === 'string' ? choiceRecord.imageUrl.trim() : '',
+        ...(linkedMediaId ? { linkedMediaId } : {}),
+        hideImageInOptions: choiceRecord.hideImageInOptions === true,
+        active: choiceRecord.active !== false,
       })
     }
 
+    // Keep groups that still have choices (including disabled ones) for admin editing.
     if (choices.length === 0) continue
 
     const id =
@@ -96,6 +122,7 @@ export function parseOptionGroups(data: unknown): ProductOptionGroup[] {
       id,
       name,
       required: record.required !== false,
+      active: record.active !== false,
       choices,
     })
   }
@@ -112,14 +139,27 @@ export function parseOptionsMode(value: unknown): ProductOptionsMode {
   return 'inherit'
 }
 
+/** Groups/choices shoppers actually see (active only, with at least one active choice). */
+export function filterShopperOptionGroups(groups: ProductOptionGroup[]): ProductOptionGroup[] {
+  return groups
+    .filter((group) => group.active !== false && group.name.trim())
+    .map((group) => ({
+      ...group,
+      choices: group.choices.filter(
+        (choice) => choice.active !== false && choice.label.trim(),
+      ),
+    }))
+    .filter((group) => group.choices.length > 0)
+}
+
 export function resolveProductOptionGroups(
   product: { optionsMode?: ProductOptionsMode; optionGroups?: ProductOptionGroup[] },
   productType: { optionGroups?: ProductOptionGroup[] } | null | undefined,
 ): ProductOptionGroup[] {
   const mode = product.optionsMode ?? 'inherit'
   if (mode === 'none') return []
-  if (mode === 'custom') return product.optionGroups ?? []
-  return productType?.optionGroups ?? []
+  const raw = mode === 'custom' ? product.optionGroups ?? [] : productType?.optionGroups ?? []
+  return filterShopperOptionGroups(raw)
 }
 
 export function lineKeyForOptions(

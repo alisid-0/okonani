@@ -1,4 +1,5 @@
 import type { ProductMedia } from '../data/products'
+import { createMediaId } from '../data/products'
 import { checkAdminAccess } from './adminApi'
 import { auth } from './firebase'
 
@@ -160,6 +161,7 @@ export async function uploadProductImages(
 
     const url = await uploadProductImageViaApi(productKey, file)
     uploaded.push({
+      id: createMediaId(),
       url,
       type: 'image',
       alt: file.name.replace(/\.[^.]+$/, ''),

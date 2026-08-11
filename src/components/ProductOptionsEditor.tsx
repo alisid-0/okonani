@@ -4,15 +4,16 @@ import {
   emptyOptionGroup,
   type ProductOptionGroup,
 } from '../data/productOptions'
-import { formatPrice } from '../data/products'
+import type { ProductMedia } from '../data/products'
 import { uploadProductImages } from '../lib/storageUpload'
 
 type ProductOptionsEditorProps = {
   groups: ProductOptionGroup[]
   onChange: (groups: ProductOptionGroup[]) => void
   disabled?: boolean
-  /** Storage folder key for option choice images */
   uploadKey?: string
+  /** When provided (product editor), choices can pick/link product gallery photos. */
+  productMedia?: ProductMedia[]
 }
 
 export default function ProductOptionsEditor({
@@ -20,9 +21,14 @@ export default function ProductOptionsEditor({
   onChange,
   disabled = false,
   uploadKey = '_option-images',
+  productMedia,
 }: ProductOptionsEditorProps) {
   const [uploadingKey, setUploadingKey] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const galleryImages = (productMedia ?? []).filter(
+    (item) => item.type === 'image' && item.url.trim() && item.id,
+  )
 
   function updateGroup(index: number, patch: Partial<ProductOptionGroup>) {
     onChange(groups.map((group, i) => (i === index ? { ...group, ...patch } : group)))
@@ -31,19 +37,51 @@ export default function ProductOptionsEditor({
   function updateChoice(
     groupIndex: number,
     choiceIndex: number,
-    patch: Partial<ProductOptionGroup['choices'][number]>,
+    patch: Partial<ProductOptionGroup['choices'][number]> & { linkedMediaId?: string | undefined },
   ) {
     onChange(
       groups.map((group, i) => {
         if (i !== groupIndex) return group
         return {
           ...group,
-          choices: group.choices.map((choice, j) =>
-            j === choiceIndex ? { ...choice, ...patch } : choice,
-          ),
+          choices: group.choices.map((choice, j) => {
+            if (j !== choiceIndex) return choice
+            const next = { ...choice, ...patch }
+            if ('linkedMediaId' in patch && !patch.linkedMediaId) {
+              delete next.linkedMediaId
+            }
+            return next
+          }),
         }
       }),
     )
+  }
+
+  function removeGroup(groupIndex: number) {
+    onChange(groups.filter((_, i) => i !== groupIndex))
+  }
+
+  function removeChoice(groupIndex: number, choiceIndex: number) {
+    const group = groups[groupIndex]
+    if (!group) return
+    const nextChoices = group.choices.filter((_, i) => i !== choiceIndex)
+    if (nextChoices.length === 0) {
+      removeGroup(groupIndex)
+      return
+    }
+    updateGroup(groupIndex, { choices: nextChoices })
+  }
+
+  /** Convenience: use a product photo as tile + gallery link (either can be cleared later). */
+  function assignProductPhoto(
+    groupIndex: number,
+    choiceIndex: number,
+    media: ProductMedia,
+  ) {
+    updateChoice(groupIndex, choiceIndex, {
+      imageUrl: media.url,
+      linkedMediaId: media.id,
+    })
   }
 
   async function handleUploadImage(
@@ -77,158 +115,345 @@ export default function ProductOptionsEditor({
 
   return (
     <div className="admin-options-editor">
-      {groups.length === 0 && (
-        <p className="admin-field-hint">
-          No option types yet. Add named types like Color or Pair with, then list the choices
-          shoppers can pick — optionally with an image for each choice.
+      <div className="admin-options-help">
+        <p>
+          <strong>Option types</strong> are groups shoppers pick from (Color, Pair with, …). Each
+          type has <strong>choices</strong> shown as tappable tiles beside the product gallery.
         </p>
+        <p>
+          Tile image and gallery jump are independent: upload or pick a product photo for the tile,
+          optionally link a (possibly different) gallery photo on select, and hide the tile image if
+          the gallery jump is enough.
+        </p>
+      </div>
+
+      {groups.length === 0 && (
+        <p className="admin-options-empty">No option types yet. Add one below to get started.</p>
       )}
 
       {uploadError && <p className="admin-alert admin-alert-error">{uploadError}</p>}
 
-      {groups.map((group, groupIndex) => (
-        <div key={group.id} className="admin-option-group">
-          <div className="admin-option-group-header">
-            <label className="admin-option-type-name">
-              Option type name
-              <input
-                value={group.name}
-                onChange={(e) => updateGroup(groupIndex, { name: e.target.value })}
-                placeholder="e.g. Color, Pair with, Size"
-                disabled={disabled}
-                required
-              />
-            </label>
-            <label className="admin-toggle">
-              <input
-                type="checkbox"
-                checked={group.required}
-                onChange={(e) => updateGroup(groupIndex, { required: e.target.checked })}
-                disabled={disabled}
-              />
-              <span>Required</span>
-            </label>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              disabled={disabled}
-              onClick={() => onChange(groups.filter((_, i) => i !== groupIndex))}
-            >
-              Remove type
-            </button>
-          </div>
+      {groups.map((group, groupIndex) => {
+        const groupOn = group.active !== false
+        return (
+          <section
+            key={group.id}
+            className={`admin-option-group ${groupOn ? '' : 'is-disabled'}`.trim()}
+          >
+            <header className="admin-option-group-top">
+              <label className="admin-option-field admin-option-field-grow">
+                <span className="admin-option-label">Option type name</span>
+                <input
+                  value={group.name}
+                  onChange={(e) => updateGroup(groupIndex, { name: e.target.value })}
+                  placeholder="e.g. Color"
+                  disabled={disabled}
+                  required
+                />
+              </label>
 
-          <p className="admin-field-hint">Choices for “{group.name.trim() || 'this option type'}”</p>
+              <div className="admin-option-group-controls">
+                <label className="admin-option-check">
+                  <input
+                    type="checkbox"
+                    checked={group.required}
+                    onChange={(e) => updateGroup(groupIndex, { required: e.target.checked })}
+                    disabled={disabled}
+                  />
+                  Required
+                </label>
+                <label className="admin-option-check">
+                  <input
+                    type="checkbox"
+                    checked={groupOn}
+                    onChange={(e) => updateGroup(groupIndex, { active: e.target.checked })}
+                    disabled={disabled}
+                  />
+                  Visible in shop
+                </label>
+                <button
+                  type="button"
+                  className="admin-option-text-btn is-danger"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Delete option type “${group.name.trim() || 'Untitled'}” and all its choices?`,
+                      )
+                    ) {
+                      removeGroup(groupIndex)
+                    }
+                  }}
+                >
+                  Delete type
+                </button>
+              </div>
+            </header>
 
-          <ul className="admin-option-choices">
-            {group.choices.map((choice, choiceIndex) => {
-              const uploadId = `${groupIndex}-${choiceIndex}`
-              return (
-                <li key={choice.id} className="admin-option-choice-row">
-                  <div className="admin-option-choice-image">
-                    {choice.imageUrl ?
-                      <img src={choice.imageUrl} alt="" />
-                    : <div className="admin-option-choice-image-empty" aria-hidden />}
-                    <div className="admin-option-choice-image-actions">
-                      <label className="btn btn-ghost btn-sm admin-home-upload-btn">
-                        {uploadingKey === uploadId ? 'Uploading…' : choice.imageUrl ? 'Replace' : 'Image'}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          hidden
-                          disabled={disabled || uploadingKey === uploadId}
-                          onChange={(e) => void handleUploadImage(groupIndex, choiceIndex, e)}
-                        />
-                      </label>
-                      {choice.imageUrl && (
+            {!groupOn && (
+              <p className="admin-option-banner">Hidden from shoppers (still editable here).</p>
+            )}
+
+            <ul className="admin-option-choices">
+              {group.choices.map((choice, choiceIndex) => {
+                const uploadId = `${groupIndex}-${choiceIndex}`
+                const choiceOn = choice.active !== false
+                const dollars = (choice.priceDeltaCents / 100).toFixed(2)
+                const linkedMedia = galleryImages.find((item) => item.id === choice.linkedMediaId)
+
+                return (
+                  <li
+                    key={choice.id}
+                    className={`admin-option-choice ${choiceOn ? '' : 'is-disabled'}`.trim()}
+                  >
+                    <div className="admin-option-choice-thumb">
+                      {choice.imageUrl && !choice.hideImageInOptions ?
+                        <img src={choice.imageUrl} alt="" />
+                      : choice.imageUrl && choice.hideImageInOptions ?
+                        <div className="admin-option-choice-thumb-empty">Hidden on tiles</div>
+                      : <div className="admin-option-choice-thumb-empty">No image</div>}
+                    </div>
+
+                    <div className="admin-option-choice-main">
+                      <div className="admin-option-choice-grid">
+                        <label className="admin-option-field">
+                          <span className="admin-option-label">Choice label</span>
+                          <input
+                            value={choice.label}
+                            onChange={(e) =>
+                              updateChoice(groupIndex, choiceIndex, { label: e.target.value })
+                            }
+                            placeholder="e.g. Pink"
+                            disabled={disabled}
+                            required
+                          />
+                        </label>
+
+                        <label className="admin-option-field admin-option-field-price">
+                          <span className="admin-option-label">Extra price ($)</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={dollars}
+                            onChange={(e) => {
+                              const raw = e.target.value.trim()
+                              const dollarsValue = Number.parseFloat(raw)
+                              updateChoice(groupIndex, choiceIndex, {
+                                priceDeltaCents: Number.isFinite(dollarsValue)
+                                  ? Math.round(dollarsValue * 100)
+                                  : 0,
+                              })
+                            }}
+                            disabled={disabled}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="admin-option-choice-toolbar">
+                        <label className="admin-option-check">
+                          <input
+                            type="checkbox"
+                            checked={choiceOn}
+                            onChange={(e) =>
+                              updateChoice(groupIndex, choiceIndex, { active: e.target.checked })
+                            }
+                            disabled={disabled}
+                          />
+                          Visible in shop
+                        </label>
+
+                        <label className="admin-option-check">
+                          <input
+                            type="checkbox"
+                            checked={choice.hideImageInOptions === true}
+                            onChange={(e) =>
+                              updateChoice(groupIndex, choiceIndex, {
+                                hideImageInOptions: e.target.checked,
+                              })
+                            }
+                            disabled={disabled}
+                          />
+                          Hide image from options section
+                        </label>
+
+                        <label className="admin-option-text-btn">
+                          {uploadingKey === uploadId ?
+                            'Uploading…'
+                          : choice.imageUrl ?
+                            'Upload different image'
+                          : 'Upload image'}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            disabled={disabled || uploadingKey === uploadId}
+                            onChange={(e) => void handleUploadImage(groupIndex, choiceIndex, e)}
+                          />
+                        </label>
+
+                        {choice.imageUrl ?
+                          <button
+                            type="button"
+                            className="admin-option-text-btn"
+                            disabled={disabled}
+                            onClick={() =>
+                              updateChoice(groupIndex, choiceIndex, { imageUrl: '' })
+                            }
+                          >
+                            Clear tile image
+                          </button>
+                        : null}
+
                         <button
                           type="button"
-                          className="btn btn-ghost btn-sm"
+                          className="admin-option-text-btn is-danger"
                           disabled={disabled}
-                          onClick={() => updateChoice(groupIndex, choiceIndex, { imageUrl: '' })}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Delete choice “${choice.label.trim() || 'Untitled'}”?`,
+                              )
+                            ) {
+                              removeChoice(groupIndex, choiceIndex)
+                            }
+                          }}
                         >
-                          Remove
+                          Delete choice
                         </button>
+                      </div>
+
+                      {galleryImages.length > 0 && (
+                        <div className="admin-option-media-tools">
+                          <div className="admin-option-media-block">
+                            <p className="admin-option-label">
+                              Product photos — click to use as tile + gallery jump
+                            </p>
+                            <div className="admin-option-media-strip" role="list">
+                              {galleryImages.map((media) => {
+                                const isTile = choice.imageUrl === media.url
+                                const isLinked = choice.linkedMediaId === media.id
+                                return (
+                                  <button
+                                    key={media.id}
+                                    type="button"
+                                    role="listitem"
+                                    className={`admin-option-media-thumb ${isTile || isLinked ? 'is-active' : ''}`}
+                                    disabled={disabled}
+                                    title="Use as tile image and gallery jump"
+                                    onClick={() =>
+                                      assignProductPhoto(groupIndex, choiceIndex, media)
+                                    }
+                                  >
+                                    <img src={media.url} alt="" />
+                                    {(isTile || isLinked) && (
+                                      <span className="admin-option-media-badge">
+                                        {isTile && isLinked ? 'Both' : isTile ? 'Tile' : 'Jump'}
+                                      </span>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="admin-option-media-block">
+                            <p className="admin-option-label">
+                              Gallery jump only (can differ from tile)
+                              {linkedMedia ? ` · linked` : ' · none'}
+                            </p>
+                            <div className="admin-option-media-strip" role="list">
+                              {galleryImages.map((media) => {
+                                const isLinked = choice.linkedMediaId === media.id
+                                return (
+                                  <button
+                                    key={`link-${media.id}`}
+                                    type="button"
+                                    role="listitem"
+                                    className={`admin-option-media-thumb ${isLinked ? 'is-linked' : ''}`}
+                                    disabled={disabled}
+                                    title="Jump gallery to this photo when selected"
+                                    onClick={() =>
+                                      updateChoice(groupIndex, choiceIndex, {
+                                        linkedMediaId: isLinked ? undefined : media.id,
+                                      })
+                                    }
+                                  >
+                                    <img src={media.url} alt="" />
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {choice.linkedMediaId ?
+                              <button
+                                type="button"
+                                className="admin-option-text-btn"
+                                disabled={disabled}
+                                onClick={() =>
+                                  updateChoice(groupIndex, choiceIndex, {
+                                    linkedMediaId: undefined,
+                                  })
+                                }
+                              >
+                                Clear gallery jump
+                              </button>
+                            : null}
+                          </div>
+
+                          <div className="admin-option-media-block">
+                            <p className="admin-option-label">Tile image only (no gallery jump)</p>
+                            <div className="admin-option-media-strip" role="list">
+                              {galleryImages.map((media) => {
+                                const isTile = choice.imageUrl === media.url
+                                return (
+                                  <button
+                                    key={`tile-${media.id}`}
+                                    type="button"
+                                    role="listitem"
+                                    className={`admin-option-media-thumb ${isTile ? 'is-tile' : ''}`}
+                                    disabled={disabled}
+                                    title="Use as tile image only"
+                                    onClick={() =>
+                                      updateChoice(groupIndex, choiceIndex, {
+                                        imageUrl: media.url,
+                                      })
+                                    }
+                                  >
+                                    <img src={media.url} alt="" />
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
+                  </li>
+                )
+              })}
+            </ul>
 
-                  <label>
-                    Choice
-                    <input
-                      value={choice.label}
-                      onChange={(e) =>
-                        updateChoice(groupIndex, choiceIndex, { label: e.target.value })
-                      }
-                      placeholder="e.g. Red, Gold charm"
-                      disabled={disabled}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Extra $
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(choice.priceDeltaCents / 100).toFixed(2)}
-                      onChange={(e) => {
-                        const dollars = Number.parseFloat(e.target.value)
-                        updateChoice(groupIndex, choiceIndex, {
-                          priceDeltaCents: Number.isFinite(dollars) ? Math.round(dollars * 100) : 0,
-                        })
-                      }}
-                      disabled={disabled}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    disabled={disabled || group.choices.length <= 1}
-                    onClick={() =>
-                      updateGroup(groupIndex, {
-                        choices: group.choices.filter((_, i) => i !== choiceIndex),
-                      })
-                    }
-                  >
-                    Remove
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={disabled}
-            onClick={() =>
-              updateGroup(groupIndex, { choices: [...group.choices, emptyOptionChoice()] })
-            }
-          >
-            Add choice
-          </button>
-        </div>
-      ))}
+            <button
+              type="button"
+              className="admin-option-secondary-btn"
+              disabled={disabled}
+              onClick={() =>
+                updateGroup(groupIndex, { choices: [...group.choices, emptyOptionChoice()] })
+              }
+            >
+              + Add choice
+            </button>
+          </section>
+        )
+      })}
 
       <button
         type="button"
-        className="btn btn-ghost btn-sm"
+        className="admin-option-secondary-btn"
         disabled={disabled}
         onClick={() => onChange([...groups, emptyOptionGroup()])}
       >
-        Add option type
+        + Add option type
       </button>
-
-      {groups.some((group) => group.choices.some((choice) => choice.priceDeltaCents !== 0)) && (
-        <p className="admin-field-hint">
-          Extra amounts are added to the product price in cart (e.g. +
-          {formatPrice(
-            groups.flatMap((g) => g.choices).find((c) => c.priceDeltaCents !== 0)?.priceDeltaCents ??
-              0,
-          )}
-          ).
-        </p>
-      )}
     </div>
   )
 }

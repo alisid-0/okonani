@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import ProductGallery from '../components/ProductGallery'
-import ProductOptionModal from '../components/ProductOptionModal'
+import ProductOptionTiles from '../components/ProductOptionTiles'
 import ReviewForm from '../components/ReviewForm'
 import StarRating from '../components/StarRating'
 import { useAuth } from '../context/AuthContext'
@@ -11,13 +11,18 @@ import {
   availableStock,
   averageRating,
   formatPrice,
+  indexOfMediaId,
   isProductSoldOut,
   useProduct,
   useProductReviews,
 } from '../data/products'
 import {
+  buildSelectedOptions,
   formatSelectedOptions,
   resolveProductOptionGroups,
+  unitPriceWithOptions,
+  validateSelectedOptions,
+  type ProductOptionChoice,
   type SelectedProductOption,
 } from '../data/productOptions'
 import { getProductTypeById, useProductTypes } from '../data/productTypes'
@@ -35,6 +40,7 @@ function formatReviewDate(value: string | null): string {
 }
 
 const REVIEWS_PER_PAGE = 5
+const EMPTY_SELECTION: Record<string, string> = {}
 
 export default function ProductDetail() {
   const { productId: routeProductId } = useParams()
@@ -46,7 +52,10 @@ export default function ProductDetail() {
   const { product, loading, error } = useProduct(productId)
   const [reviewVersion, setReviewVersion] = useState(0)
   const [reviewPage, setReviewPage] = useState(1)
-  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [selectedByGroupId, setSelectedByGroupId] =
+    useState<Record<string, string>>(EMPTY_SELECTION)
+  const [galleryIndex, setGalleryIndex] = useState(0)
+  const [optionsError, setOptionsError] = useState<string | null>(null)
   const [lastSelected, setLastSelected] = useState<SelectedProductOption[]>([])
   const [deletingReviewId, setDeletingReviewId] = useState<string | null>(null)
   const { reviews, loading: reviewsLoading } = useProductReviews(productId, reviewVersion)
@@ -62,13 +71,23 @@ export default function ProductDetail() {
   const hasOptions = optionGroups.length > 0
   const totalReviewPages = Math.max(1, Math.ceil(reviews.length / REVIEWS_PER_PAGE))
 
+  const selected = useMemo(
+    () => buildSelectedOptions(optionGroups, selectedByGroupId),
+    [optionGroups, selectedByGroupId],
+  )
+  const displayPriceCents = product
+    ? unitPriceWithOptions(product.priceInCents, selected)
+    : 0
+
   useEffect(() => {
     setReviewPage(1)
   }, [reviewVersion, productId])
 
   useEffect(() => {
     setLastSelected([])
-    setOptionsOpen(false)
+    setSelectedByGroupId(EMPTY_SELECTION)
+    setOptionsError(null)
+    setGalleryIndex(0)
   }, [productId])
 
   useEffect(() => {
@@ -82,26 +101,33 @@ export default function ProductDetail() {
     reviewPage * REVIEWS_PER_PAGE,
   )
 
+  function handleSelectChoice(groupId: string, choiceId: string, choice: ProductOptionChoice) {
+    setSelectedByGroupId((prev) => ({ ...prev, [groupId]: choiceId }))
+    setOptionsError(null)
+    if (!product) return
+    const linkedIndex = indexOfMediaId(product.media, choice.linkedMediaId)
+    if (linkedIndex >= 0) setGalleryIndex(linkedIndex)
+  }
+
   function handleAddToCartClick() {
     if (!product) return
     if (isProductSoldOut(product)) return
     const remaining = remainingForProduct(product)
     if (remaining !== null && remaining < 1) return
+
     if (hasOptions) {
-      setOptionsOpen(true)
+      const validationError = validateSelectedOptions(optionGroups, selectedByGroupId)
+      if (validationError) {
+        setOptionsError(validationError)
+        return
+      }
+      const nextSelected = buildSelectedOptions(optionGroups, selectedByGroupId)
+      setLastSelected(nextSelected)
+      addItem(product, nextSelected)
       return
     }
-    addItem(product)
-  }
 
-  function handleOptionsConfirm(selected: SelectedProductOption[]) {
-    if (!product) return
-    if (isProductSoldOut(product)) return
-    const remaining = remainingForProduct(product)
-    if (remaining !== null && remaining < 1) return
-    setLastSelected(selected)
-    addItem(product, selected)
-    setOptionsOpen(false)
+    addItem(product)
   }
 
   async function handleDeleteReview(reviewUserId: string) {
@@ -157,7 +183,12 @@ export default function ProductDetail() {
       <div className="product-detail-shell">
         <div className="product-detail-layout">
           <div className="product-detail-gallery-wrap">
-            <ProductGallery media={product.media} productName={product.name} />
+            <ProductGallery
+              media={product.media}
+              productName={product.name}
+              activeIndex={galleryIndex}
+              onActiveIndexChange={setGalleryIndex}
+            />
           </div>
 
           <section className="product-detail-panel">
@@ -167,7 +198,7 @@ export default function ProductDetail() {
             {product.description && <p className="product-detail-lead">{product.description}</p>}
 
             <div className="product-detail-price-row">
-              <p className="product-detail-price">{formatPrice(product.priceInCents)}</p>
+              <p className="product-detail-price">{formatPrice(displayPriceCents)}</p>
               {rating != null && (
                 <div className="product-detail-rating">
                   <StarRating rating={rating} />
@@ -195,9 +226,17 @@ export default function ProductDetail() {
             })()}
 
             {hasOptions && (
-              <p className="product-detail-options-note">
-                This item has options{lastSelectedLabel ? ` · last added: ${lastSelectedLabel}` : ''}.
-              </p>
+              <div className="product-detail-options">
+                <ProductOptionTiles
+                  groups={optionGroups}
+                  selectedByGroupId={selectedByGroupId}
+                  onSelect={handleSelectChoice}
+                />
+                {lastSelectedLabel && (
+                  <p className="product-detail-options-note">Last added: {lastSelectedLabel}</p>
+                )}
+                {optionsError && <p className="form-error">{optionsError}</p>}
+              </div>
             )}
 
             <div className="product-detail-actions">
@@ -214,9 +253,7 @@ export default function ProductDetail() {
                   ? 'Sold out'
                   : remainingForProduct(product) !== null && remainingForProduct(product)! < 1
                     ? 'Max in cart'
-                    : hasOptions
-                      ? 'Choose options & add'
-                      : 'Add to cart'}
+                    : 'Add to cart'}
               </button>
             </div>
 
@@ -315,15 +352,6 @@ export default function ProductDetail() {
           )}
         </section>
       </div>
-
-      <ProductOptionModal
-        open={optionsOpen}
-        productName={product.name}
-        basePriceCents={product.priceInCents}
-        groups={optionGroups}
-        onClose={() => setOptionsOpen(false)}
-        onConfirm={handleOptionsConfirm}
-      />
     </div>
   )
 }

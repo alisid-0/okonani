@@ -1,6 +1,8 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import {
   DEFAULT_OFFLINE_MESSAGE,
+  DEFAULT_SHOP_PAUSED_MESSAGE,
+  DEFAULT_SHOP_PAUSED_TITLE,
   DEFAULT_SITE_SETTINGS,
   SITE_NAV_PAGES,
   type SitePageId,
@@ -16,6 +18,8 @@ function toForm(settings: SiteSettings): PageForm {
     siteOffline: settings.siteOffline,
     offlineMessage: settings.offlineMessage,
     shoppingPaused: settings.shoppingPaused,
+    shoppingPausedTitle: settings.shoppingPausedTitle,
+    shoppingPausedMessage: settings.shoppingPausedMessage,
     home: { ...settings.home, collections: [...settings.home.collections] },
   }
 }
@@ -133,6 +137,32 @@ export default function AdminPages() {
                 <strong>Pause orders &amp; shopping</strong>
                 <small>Shows a modal on first visit and when someone tries to add to cart.</small>
               </span>
+            </label>
+
+            <label>
+              Modal title
+              <input
+                type="text"
+                value={form.shoppingPausedTitle}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, shoppingPausedTitle: event.target.value }))
+                }
+                placeholder={DEFAULT_SHOP_PAUSED_TITLE}
+                disabled={!form.shoppingPaused}
+              />
+            </label>
+
+            <label>
+              Modal message
+              <textarea
+                rows={4}
+                value={form.shoppingPausedMessage}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, shoppingPausedMessage: event.target.value }))
+                }
+                placeholder={DEFAULT_SHOP_PAUSED_MESSAGE}
+                disabled={!form.shoppingPaused}
+              />
             </label>
           </div>
 

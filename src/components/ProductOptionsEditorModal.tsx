@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import AdminModal from './AdminModal'
 import ProductOptionsEditor from './ProductOptionsEditor'
 import type { ProductOptionGroup } from '../data/productOptions'
+import type { ProductMedia } from '../data/products'
 
 type ProductOptionsEditorModalProps = {
   open: boolean
@@ -9,6 +10,7 @@ type ProductOptionsEditorModalProps = {
   description?: string
   groups: ProductOptionGroup[]
   uploadKey?: string
+  productMedia?: ProductMedia[]
   onClose: () => void
   onSave: (groups: ProductOptionGroup[]) => void
 }
@@ -16,9 +18,10 @@ type ProductOptionsEditorModalProps = {
 export default function ProductOptionsEditorModal({
   open,
   title = 'Edit options',
-  description = 'Name each option type and add choices. Choices can include an image shoppers see when selecting.',
+  description = 'Edit option types and choices. Tile image, gallery jump, and visibility are independent.',
   groups,
   uploadKey,
+  productMedia,
   onClose,
   onSave,
 }: ProductOptionsEditorModalProps) {
@@ -60,7 +63,12 @@ export default function ProductOptionsEditorModal({
         </>
       }
     >
-      <ProductOptionsEditor groups={draft} onChange={setDraft} uploadKey={uploadKey} />
+      <ProductOptionsEditor
+        groups={draft}
+        onChange={setDraft}
+        uploadKey={uploadKey}
+        productMedia={productMedia}
+      />
     </AdminModal>
   )
 }
