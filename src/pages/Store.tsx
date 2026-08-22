@@ -12,6 +12,7 @@ import {
 import { productHasConfigurableOptions } from '../data/productOptions'
 import { useProducts } from '../data/products'
 import { getProductTypeById, useProductTypes } from '../data/productTypes'
+import { playUiSound, unlockUiSounds } from '../lib/uiSounds'
 
 export default function Store() {
   const navigate = useNavigate()
@@ -64,6 +65,8 @@ export default function Store() {
     (activeTypeMeta ? `Showing ${activeTypeMeta.name.toLowerCase()}.` : undefined)
 
   function updateFilters(next: { category?: string; type?: string }) {
+    unlockUiSounds()
+    playUiSound('tap')
     const params = new URLSearchParams()
     const category = next.category ?? activeCategory
     const type = next.type ?? activeType
@@ -73,12 +76,16 @@ export default function Store() {
   }
 
   function clearFilters() {
+    unlockUiSounds()
+    playUiSound('soft')
     setSearchParams({})
   }
 
   function handleAdd(product: (typeof products)[number]) {
+    unlockUiSounds()
     const productType = getProductTypeById(productTypes, product.productTypeId)
     if (productHasConfigurableOptions(product, productType)) {
+      playUiSound('tap')
       navigate(`/store/${product.id}`)
       return
     }
@@ -88,7 +95,7 @@ export default function Store() {
   const hasActiveFilters = activeCategory !== 'all' || activeType !== 'all'
 
   return (
-    <div className="page store-page notebook-page">
+    <div className="page store-page notebook-page" onPointerDown={() => unlockUiSounds()}>
       <PageHeader title="Shop" subtitle={subtitle} />
 
       <section className="store-browse" aria-label="Shop catalog">

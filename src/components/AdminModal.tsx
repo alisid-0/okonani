@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { uiClick } from '../lib/uiSounds'
 
 type AdminModalProps = {
   title: string
@@ -22,13 +23,18 @@ export default function AdminModal({
   wide = false,
   preview = false,
 }: AdminModalProps) {
+  function closeWithSound() {
+    uiClick('soft')
+    onClose()
+  }
+
   useEffect(() => {
     if (!open) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') closeWithSound()
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -36,12 +42,13 @@ export default function AdminModal({
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', onKeyDown)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sound only on escape while open
   }, [open, onClose])
 
   if (!open) return null
 
   return (
-    <div className="admin-modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="admin-modal-backdrop" role="presentation" onClick={closeWithSound}>
       <div
         className={`admin-modal ${wide ? 'is-wide' : ''} ${preview ? 'is-preview' : ''}`.trim()}
         role="dialog"
@@ -54,7 +61,7 @@ export default function AdminModal({
             <h2 id="admin-modal-title">{title}</h2>
             {description && <p>{description}</p>}
           </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={closeWithSound}>
             Close
           </button>
         </header>

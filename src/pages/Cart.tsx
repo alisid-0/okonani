@@ -10,6 +10,7 @@ import { formatPrice, getProductCover, maxOrderQuantity } from '../data/products
 import { formatSelectedOptions, unitPriceWithOptions } from '../data/productOptions'
 import ProtectedImage from '../components/ProtectedImage'
 import { getRewardsSummary, type RewardsSummary } from '../lib/rewardsApi'
+import { uiClick } from '../lib/uiSounds'
 
 export default function Cart() {
   const { user } = useAuth()
@@ -71,6 +72,7 @@ export default function Cart() {
 
   function handleCheckoutClick() {
     setError(null)
+    uiClick('tap')
 
     if (shoppingPaused) {
       showPausedModal()
@@ -93,7 +95,7 @@ export default function Cart() {
         <PageSheet>
           <div className="cart-empty">
             <p>No items in your cart yet.</p>
-            <Link to="/store" className="btn btn-primary">
+            <Link to="/store" className="btn btn-primary" onClick={() => uiClick('soft')}>
               Continue shopping
             </Link>
           </div>

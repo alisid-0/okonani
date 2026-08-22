@@ -3,6 +3,7 @@ import AdminModal from './AdminModal'
 import ProductOptionsEditor from './ProductOptionsEditor'
 import type { ProductOptionGroup } from '../data/productOptions'
 import type { ProductMedia } from '../data/products'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type ProductOptionsEditorModalProps = {
   open: boolean
@@ -47,7 +48,14 @@ export default function ProductOptionsEditorModal({
       wide
       footer={
         <>
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              uiClick('soft')
+              onClose()
+            }}
+          >
             Cancel
           </button>
           <button
@@ -56,6 +64,7 @@ export default function ProductOptionsEditorModal({
             onClick={() => {
               onSave(draft)
               onClose()
+              playUiSound('success')
             }}
           >
             Done

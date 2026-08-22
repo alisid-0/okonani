@@ -6,6 +6,7 @@ import { GuestRewardsPrompt } from '../components/RewardsPrompt'
 import { formatPrice } from '../data/products'
 import { useCart } from '../context/CartContext'
 import { getCheckoutSession } from '../lib/checkout'
+import { uiClick } from '../lib/uiSounds'
 
 export default function CheckoutSuccess() {
   const [searchParams] = useSearchParams()
@@ -53,7 +54,7 @@ export default function CheckoutSuccess() {
         <GuestRewardsPrompt returnTo="/store" compact />
       )}
 
-      <Link to="/store" className="btn btn-primary">
+      <Link to="/store" className="btn btn-primary" onClick={() => uiClick('soft')}>
         Continue shopping
       </Link>
       </PageSheet>

@@ -5,6 +5,7 @@ import { EmbeddedCheckout, EmbeddedCheckoutProvider } from '@stripe/react-stripe
 import { useCart } from '../context/CartContext'
 import { createCheckoutSession, updateCheckoutShipping } from '../lib/checkout'
 import { getOptionalAuthToken } from '../lib/rewardsApi'
+import { uiClick } from '../lib/uiSounds'
 
 const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim() || ''
 const stripePromise = publishableKey ? loadStripe(publishableKey) : null
@@ -89,10 +90,10 @@ export default function Checkout() {
     return (
       <div className="checkout-shell">
         <header className="checkout-shell-bar">
-          <Link to="/cart" className="checkout-shell-back">
+          <Link to="/cart" className="checkout-shell-back" onClick={() => uiClick('soft')}>
             ← Cart
           </Link>
-          <Link to="/" className="checkout-shell-brand">
+          <Link to="/" className="checkout-shell-brand" onClick={() => uiClick('soft')}>
             okonani
           </Link>
           <span className="checkout-shell-spacer" aria-hidden="true" />
@@ -111,10 +112,10 @@ export default function Checkout() {
     return (
       <div className="checkout-shell">
         <header className="checkout-shell-bar">
-          <Link to="/cart" className="checkout-shell-back">
+          <Link to="/cart" className="checkout-shell-back" onClick={() => uiClick('soft')}>
             ← Cart
           </Link>
-          <Link to="/" className="checkout-shell-brand">
+          <Link to="/" className="checkout-shell-brand" onClick={() => uiClick('soft')}>
             okonani
           </Link>
           <span className="checkout-shell-spacer" aria-hidden="true" />
@@ -131,10 +132,10 @@ export default function Checkout() {
   return (
     <div className="checkout-shell">
       <header className="checkout-shell-bar">
-        <Link to="/cart" className="checkout-shell-back">
+        <Link to="/cart" className="checkout-shell-back" onClick={() => uiClick('soft')}>
           ← Cart
         </Link>
-        <Link to="/" className="checkout-shell-brand">
+        <Link to="/" className="checkout-shell-brand" onClick={() => uiClick('soft')}>
           okonani
         </Link>
         <span className="checkout-shell-spacer" aria-hidden="true" />

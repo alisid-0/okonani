@@ -3,6 +3,7 @@ import Cropper, { type Area, type Point } from 'react-easy-crop'
 import 'react-easy-crop/react-easy-crop.css'
 import { exportCroppedImageFile } from '../lib/cropImage'
 import { fetchAdminMediaBlobUrl, isFirebaseStorageUrl } from '../lib/storageUpload'
+import { playUiSound, unlockUiSounds } from '../lib/uiSounds'
 
 type ImageCropModalProps = {
   source: File | string
@@ -90,17 +91,21 @@ export default function ImageCropModal({
   async function handleConfirm() {
     if (!imageUrl || !croppedAreaPixels) {
       setError('Adjust the crop area before saving.')
+      playUiSound('soft')
       return
     }
 
     setProcessing(true)
     setError(null)
+    unlockUiSounds()
 
     try {
       const cropped = await exportCroppedImageFile(imageUrl, croppedAreaPixels, source)
+      playUiSound('success')
       onConfirm(cropped)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not crop image')
+      playUiSound('soft')
     } finally {
       setProcessing(false)
     }
@@ -161,13 +166,22 @@ export default function ImageCropModal({
         {error && <p className="form-error">{error}</p>}
 
         <footer className="image-crop-actions">
-          <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={processing}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              unlockUiSounds()
+              playUiSound('soft')
+              onCancel()
+            }}
+            disabled={processing}
+          >
             Cancel
           </button>
           <button
             type="button"
             className="btn btn-primary"
-            onClick={handleConfirm}
+            onClick={() => void handleConfirm()}
             disabled={processing || loadingImage || !imageUrl}
           >
             {processing ? 'Saving crop…' : replaceExisting ? 'Update store image' : 'Use cropped image'}

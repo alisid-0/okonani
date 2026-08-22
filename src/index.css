@@ -18,7 +18,9 @@
 
 :root {
   --font-family: 'Shaabyla', 'Shaabyla Fallback', system-ui, sans-serif;
-  --admin-form-font: 'Segoe UI', 'Helvetica Neue', ui-sans-serif, sans-serif;
+  /* Legible UI copy (account, product body text, options) — not the store display face */
+  --readable-font: 'Segoe UI', 'Helvetica Neue', ui-sans-serif, sans-serif;
+  --admin-form-font: var(--readable-font);
   --palette-pink: #ee9bbc;
   --palette-yellow: #fede8d;
   --palette-blue: #c2d1e9;
@@ -408,6 +410,63 @@ textarea {
 
 .main-home .home-notebook-sheet {
   max-width: var(--max-width);
+}
+
+.home-hero-animate {
+  animation: homeHeroIn 0.7s ease both;
+}
+
+.home-section-animate {
+  animation: homeSectionIn 0.55s ease both;
+}
+
+.home-collection-tile {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.home-collection-tile:hover {
+  transform: translateY(-3px);
+}
+
+.product-card-compact {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.product-card-compact:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes homeHeroIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes homeSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-animate,
+  .home-section-animate,
+  .home-collection-tile,
+  .product-card-compact {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 .home-section-title {
@@ -1089,6 +1148,31 @@ textarea {
   border-radius: var(--radius);
   background: var(--color-surface);
   margin-bottom: 1.5rem;
+}
+
+.page-account,
+.page-account .page-header,
+.page-account .page-header h1,
+.page-account .page-header p,
+.page-account .account-card,
+.page-account .account-card h2,
+.page-account .account-copy,
+.page-account .account-toggle,
+.page-account .account-actions,
+.page-account .account-points,
+.page-account .account-reward-list,
+.page-account .account-reward-list h3,
+.page-account .account-reward-list li,
+.page-account .account-reward-list code,
+.page-account label,
+.page-account button,
+.page-account input,
+.page-account p,
+.page-account span,
+.page-account strong,
+.page-account small {
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .account-card h2 {
@@ -1947,6 +2031,8 @@ textarea {
   color: var(--color-muted);
   font-size: var(--text-lg);
   line-height: 1.65;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-price-row {
@@ -1961,6 +2047,8 @@ textarea {
   margin: 0;
   font-size: var(--text-2xl);
   font-weight: 700;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-rating {
@@ -1975,16 +2063,22 @@ textarea {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--color-border);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-copy h2 {
   margin: 0 0 1rem;
   font-size: var(--text-xl);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-copy p {
   margin: 0 0 1rem;
   color: var(--color-muted);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-reviews {
@@ -3822,12 +3916,16 @@ textarea {
   display: grid;
   gap: 1rem;
   margin: 1rem 0 1.25rem;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-option-group {
   margin: 0;
   padding: 0;
   border: none;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-option-group legend {
@@ -3835,6 +3933,8 @@ textarea {
   margin-bottom: 0.45rem;
   font-weight: 700;
   font-size: var(--text-sm);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-option-choices {
@@ -3866,6 +3966,8 @@ textarea {
 .product-option-delta {
   opacity: 0.7;
   font-size: 0.9em;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .cart-item-options {
@@ -4178,11 +4280,15 @@ textarea {
   display: grid;
   gap: 0.75rem;
   margin: 0.35rem 0 0.15rem;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-option-tiles-stack {
   display: grid;
   gap: 1rem;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .admin-options-preview-list {
@@ -4390,7 +4496,8 @@ textarea {
   border-radius: 0.7rem;
   background: color-mix(in srgb, var(--palette-cream, #fff8f0) 50%, white);
   color: inherit;
-  font: inherit;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
   text-align: left;
   cursor: pointer;
   appearance: none;
@@ -4426,6 +4533,15 @@ textarea {
 .product-option-tile-label {
   font-size: var(--text-sm);
   font-weight: 600;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
+}
+
+.product-option-delta {
+  opacity: 0.7;
+  font-size: 0.9em;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-option-modal-error {
@@ -4443,6 +4559,8 @@ textarea {
   margin: 0 0 0.75rem;
   font-size: var(--text-sm);
   color: var(--color-muted);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .admin-orders-item-options {
@@ -4454,6 +4572,95 @@ textarea {
 .admin-home-form {
   display: grid;
   gap: 1.25rem;
+}
+
+.admin-home-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.admin-home-add-row label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 10rem;
+}
+
+.admin-home-section-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.admin-home-section-card {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--palette-brown) 12%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--palette-cream, #fff8f0) 45%, white);
+}
+
+.admin-home-section-card.is-disabled {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.admin-home-section-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.admin-home-section-move {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-home-section-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-home-show-description {
+  align-items: flex-start;
+}
+
+.admin-home-show-description span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.admin-home-show-description small {
+  font-weight: 400;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+.admin-home-product-picks {
+  display: grid;
+  gap: 0.55rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid color-mix(in srgb, var(--palette-brown) 10%, transparent);
+}
+
+.admin-home-product-pick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.35rem 0.75rem;
+  max-height: 14rem;
+  overflow: auto;
 }
 
 .admin-home-category-list,

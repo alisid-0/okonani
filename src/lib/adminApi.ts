@@ -18,6 +18,7 @@ import {
 import {
   DEFAULT_SITE_SETTINGS,
   parseSiteSettings,
+  serializeHomeLayout,
   SITE_SETTINGS_DOC,
   type SiteSettings,
 } from '../data/siteSettings'
@@ -746,7 +747,7 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
     settings.shoppingPausedTitle.trim() || DEFAULT_SITE_SETTINGS.shoppingPausedTitle
   const shoppingPausedMessage =
     settings.shoppingPausedMessage.trim() || DEFAULT_SITE_SETTINGS.shoppingPausedMessage
-  const home = settings.home ?? DEFAULT_SITE_SETTINGS.home
+  const home = serializeHomeLayout(settings.home ?? DEFAULT_SITE_SETTINGS.home)
 
   await setDoc(
     doc(db, SITE_SETTINGS_DOC),
@@ -758,6 +759,20 @@ export async function saveSiteSettings(settings: SiteSettings): Promise<void> {
       shoppingPausedTitle,
       shoppingPausedMessage,
       home: {
+        sections: home.sections.map((section, index) => ({
+          id: section.id,
+          kind: section.kind,
+          enabled: section.enabled !== false,
+          sortOrder: index,
+          title: section.title.trim(),
+          lead: section.lead.trim(),
+          showDescription: section.showDescription !== false,
+          sourceId: section.sourceId.trim(),
+          productLimit: Math.min(24, Math.max(1, Math.round(section.productLimit) || 4)),
+          productIds: (section.productIds ?? [])
+            .map((id) => id.trim())
+            .filter(Boolean),
+        })),
         collectionsEnabled: home.collectionsEnabled === true,
         collectionsTitle: home.collectionsTitle.trim() || DEFAULT_SITE_SETTINGS.home.collectionsTitle,
         collectionsLead: home.collectionsLead.trim(),

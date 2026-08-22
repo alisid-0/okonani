@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { playUiSound, uiClick, unlockUiSounds } from '../lib/uiSounds'
 
 export default function AdminLogin() {
   const { user, isAdmin, loading: authLoading, signIn } = useAuth()
@@ -27,11 +28,14 @@ export default function AdminLogin() {
     event.preventDefault()
     setLoading(true)
     setError(null)
+    unlockUiSounds()
 
     try {
       await signIn(email, password)
+      playUiSound('success')
     } catch {
       setError('Could not sign in.')
+      playUiSound('soft')
       setLoading(false)
       return
     }
@@ -77,7 +81,9 @@ export default function AdminLogin() {
       </form>
 
       <p className="auth-footer">
-        <Link to="/">Back to site</Link>
+        <Link to="/" onClick={() => uiClick('soft')}>
+          Back to site
+        </Link>
       </p>
     </div>
   )

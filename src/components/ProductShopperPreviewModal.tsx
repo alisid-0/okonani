@@ -13,6 +13,7 @@ import {
   type SelectedProductOption,
 } from '../data/productOptions'
 import { formatPrice, indexOfMediaId, type Product } from '../data/products'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type ProductShopperPreviewModalProps = {
   open: boolean
@@ -64,8 +65,10 @@ export default function ProductShopperPreviewModal({
     if (validationError) {
       setError(validationError)
       setAddedNote(null)
+      playUiSound('soft')
       return
     }
+    playUiSound('add')
     setAddedNote(
       shopperGroups.length === 0
         ? 'Preview only — in the real shop this would add the item to the cart.'
@@ -82,7 +85,14 @@ export default function ProductShopperPreviewModal({
       wide
       preview
       footer={
-        <button type="button" className="btn btn-primary" onClick={onClose}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            uiClick('soft')
+            onClose()
+          }}
+        >
           Close preview
         </button>
       }

@@ -5,6 +5,7 @@ import {
   markContactMessageRead,
   type AdminContactMessage,
 } from '../lib/adminApi'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 function formatMessageDate(value: string | null): string {
   if (!value) return 'Unknown date'
@@ -55,6 +56,7 @@ export default function AdminMessages() {
   const unreadCount = messages.filter((message) => !message.read).length
 
   async function handleSelect(message: AdminContactMessage) {
+    uiClick('tap')
     setSelectedId(message.id)
     setActionMessage(null)
 
@@ -79,11 +81,13 @@ export default function AdminMessages() {
     try {
       await deleteAdminContactMessage(message.id)
       setActionMessage('Message deleted.')
+      playUiSound('success')
       const nextMessages = messages.filter((item) => item.id !== message.id)
       setMessages(nextMessages)
       setSelectedId(nextMessages[0]?.id ?? null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete message')
+      playUiSound('soft')
     }
   }
 
@@ -99,7 +103,14 @@ export default function AdminMessages() {
             <span className="admin-messages-unread-badge">{unreadCount} unread</span>
           )}
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => loadMessages(selectedId)}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            uiClick('soft')
+            void loadMessages(selectedId)
+          }}
+        >
           Refresh
         </button>
       </header>

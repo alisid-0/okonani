@@ -9,6 +9,7 @@ import {
   type SiteSettings,
 } from '../data/siteSettings'
 import { getSiteSettings, saveSiteSettings } from '../lib/adminApi'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type PageForm = SiteSettings
 
@@ -50,6 +51,7 @@ export default function AdminPages() {
   }, [])
 
   function togglePage(pageId: SitePageId, visible: boolean) {
+    uiClick('tap')
     setForm((prev) => ({
       ...prev,
       pages: { ...prev.pages, [pageId]: visible },
@@ -68,8 +70,10 @@ export default function AdminPages() {
         pages: { ...form.pages, about: false },
       })
       setMessage('Page settings saved.')
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save page settings')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -139,9 +143,10 @@ export default function AdminPages() {
               <input
                 type="checkbox"
                 checked={form.shoppingPaused}
-                onChange={(event) =>
+                onChange={(event) => {
+                  uiClick('tap')
                   setForm((prev) => ({ ...prev, shoppingPaused: event.target.checked }))
-                }
+                }}
               />
               <span>
                 <strong>Pause orders &amp; shopping</strong>
@@ -191,9 +196,10 @@ export default function AdminPages() {
               <input
                 type="checkbox"
                 checked={form.siteOffline}
-                onChange={(event) =>
+                onChange={(event) => {
+                  uiClick('tap')
                   setForm((prev) => ({ ...prev, siteOffline: event.target.checked }))
-                }
+                }}
               />
               <span>
                 <strong>Turn site off</strong>

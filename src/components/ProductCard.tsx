@@ -7,6 +7,7 @@ import {
   isProductSoldOut,
   type Product,
 } from '../data/products'
+import { playUiSound, unlockUiSounds } from '../lib/uiSounds'
 
 type ProductCardProps = {
   product: Product
@@ -21,7 +22,15 @@ export default function ProductCard({ product, categoryName, onAdd }: ProductCar
 
   return (
     <article className={`product-card product-card-compact ${soldOut ? 'is-sold-out' : ''}`}>
-      <Link to={`/store/${product.id}`} className="product-card-media" aria-label={`View ${product.name}`}>
+      <Link
+        to={`/store/${product.id}`}
+        className="product-card-media"
+        aria-label={`View ${product.name}`}
+        onClick={() => {
+          unlockUiSounds()
+          playUiSound('soft')
+        }}
+      >
         {cover ?
           <ProtectedImage
             src={cover}
@@ -35,7 +44,14 @@ export default function ProductCard({ product, categoryName, onAdd }: ProductCar
       </Link>
 
       <div className="product-card-body">
-        <Link to={`/store/${product.id}`} className="product-card-title">
+        <Link
+          to={`/store/${product.id}`}
+          className="product-card-title"
+          onClick={() => {
+            unlockUiSounds()
+            playUiSound('soft')
+          }}
+        >
           <h2>{product.name}</h2>
         </Link>
 
@@ -52,7 +68,10 @@ export default function ProductCard({ product, categoryName, onAdd }: ProductCar
             disabled={soldOut}
             onClick={(event) => {
               event.preventDefault()
-              if (!soldOut) onAdd()
+              if (!soldOut) {
+                unlockUiSounds()
+                onAdd()
+              }
             }}
           >
             {soldOut ? 'Sold out' : 'Add'}

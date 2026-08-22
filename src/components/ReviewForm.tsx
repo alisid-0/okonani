@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { hasPurchasedProduct, submitProductReview } from '../lib/userApi'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type ReviewFormProps = {
   productId: string
@@ -51,7 +52,7 @@ export default function ReviewForm({ productId, onSubmitted }: ReviewFormProps) 
   if (!user) {
     return (
       <p className="product-review-signin">
-        <Link to="/login" state={{ from: `/store/${productId}` }}>
+        <Link to="/login" state={{ from: `/store/${productId}` }} onClick={() => uiClick('tap')}>
           Sign in
         </Link>{' '}
         to leave a review after you purchase this item.
@@ -85,8 +86,10 @@ export default function ReviewForm({ productId, onSubmitted }: ReviewFormProps) 
       setBody('')
       setRating(5)
       onSubmitted()
+      playUiSound('success')
     } catch {
       setError('Could not submit review. Please try again.')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }

@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import PageSheet from '../components/PageSheet'
 import { useAuth } from '../context/AuthContext'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type AuthMode = 'signin' | 'signup'
 
@@ -39,7 +40,9 @@ export default function Login() {
       } else {
         await signUp(email, password)
       }
+      playUiSound('success')
     } catch {
+      playUiSound('soft')
       setError(
         mode === 'signin' ?
           'Could not sign in. Check your email and password.'
@@ -62,14 +65,20 @@ export default function Login() {
           <button
             type="button"
             className={`auth-tab ${mode === 'signin' ? 'is-active' : ''}`}
-            onClick={() => setMode('signin')}
+            onClick={() => {
+              uiClick('tap')
+              setMode('signin')
+            }}
           >
             Sign in
           </button>
           <button
             type="button"
             className={`auth-tab ${mode === 'signup' ? 'is-active' : ''}`}
-            onClick={() => setMode('signup')}
+            onClick={() => {
+              uiClick('tap')
+              setMode('signup')
+            }}
           >
             Sign up
           </button>
@@ -112,7 +121,9 @@ export default function Login() {
         </form>
 
         <p className="auth-footer">
-          <Link to="/store">Back to store</Link>
+          <Link to="/store" onClick={() => uiClick('soft')}>
+            Back to store
+          </Link>
         </p>
       </PageSheet>
     </div>

@@ -10,6 +10,7 @@ import {
   listAdminProductTypes,
   saveAdminProductType,
 } from '../lib/adminApi'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type ProductTypeForm = {
   id: string
@@ -87,12 +88,14 @@ export default function AdminProductTypes() {
   }, [])
 
   function startCreate() {
+    uiClick('tap')
     setForm(emptyForm())
     setMessage(null)
     setError(null)
   }
 
   function startEdit(type: ProductType) {
+    uiClick('tap')
     setForm(toForm(type))
     setMessage(null)
     setError(null)
@@ -107,8 +110,10 @@ export default function AdminProductTypes() {
       setTypes(installed)
       setMessage('Installed default product types (Sticker, Sheet, Charm).')
       if (installed[0]) setForm(toForm(installed[0]))
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not install defaults')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -139,8 +144,10 @@ export default function AdminProductTypes() {
       setMessage(`Saved product type “${saved.name}”.`)
       setForm(toForm(saved))
       await load()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save product type')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -152,11 +159,17 @@ export default function AdminProductTypes() {
     setError(null)
     try {
       await deleteAdminProductType(id)
-      if (form.id === id) startCreate()
+      if (form.id === id) {
+        setForm(emptyForm())
+        setMessage(null)
+        setError(null)
+      }
       await load()
       setMessage('Product type deleted.')
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete product type')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -387,14 +400,20 @@ export default function AdminProductTypes() {
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                onClick={() => setOptionsOpen(true)}
+                onClick={() => {
+                  uiClick('tap')
+                  setOptionsOpen(true)
+                }}
               >
                 {optionCount > 0 ? 'Edit options' : 'Add options'}
               </button>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
-                onClick={() => setPreviewOpen(true)}
+                onClick={() => {
+                  uiClick('tap')
+                  setPreviewOpen(true)
+                }}
                 disabled={!form.name.trim()}
               >
                 Preview shopper view

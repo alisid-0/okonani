@@ -578,6 +578,19 @@
   line-height: 1.08;
 }
 
+.product-detail-lead,
+.product-detail-price,
+.product-detail-options,
+.product-detail-options-note,
+.product-option-group,
+.product-option-group legend,
+.product-option-tile,
+.product-option-tile-label,
+.product-option-delta {
+  font-family: var(--readable-font);
+  letter-spacing: 0;
+}
+
 .product-detail-actions {
   margin-top: 0.35rem;
   padding-top: 0.25rem;
@@ -587,17 +600,23 @@
   margin-top: 1.25rem;
   padding-top: 1.35rem;
   border-top: 1px dashed rgba(238, 155, 188, 0.35);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-copy h2 {
   margin: 0 0 0.85rem;
   font-size: var(--text-xl);
   color: var(--craft-crayon-mint-deep);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-copy p {
   margin: 0 0 0.85rem;
   line-height: 1.7;
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .product-detail-copy p:last-child {
@@ -788,11 +807,22 @@
   border-radius: calc(var(--radius) + 6px);
   border: 1px dashed rgba(238, 155, 188, 0.35);
   background: rgba(255, 255, 255, 0.55);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .account-card h2 {
   margin: 0 0 0.5rem;
   color: var(--craft-crayon-pink-hot);
+  font-family: var(--readable-font);
+  letter-spacing: 0;
+}
+
+.page-account,
+.page-account .page-header h1,
+.page-account .page-header p {
+  font-family: var(--readable-font);
+  letter-spacing: 0;
 }
 
 .account-actions {

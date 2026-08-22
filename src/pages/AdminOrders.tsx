@@ -10,6 +10,7 @@ import {
   type AdminOrder,
 } from '../lib/adminApi'
 import { packageTypeLabel, type PackageType } from '../lib/packaging'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 function formatOrderDate(value: string | null): string {
   if (!value) return '—'
@@ -75,6 +76,7 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null)
 
   function selectOrder(orderId: string) {
+    uiClick('tap')
     setSelectedId(orderId)
     const params = new URLSearchParams(searchParams)
     params.set('panel', 'orders')
@@ -156,9 +158,11 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
       setSelectedRateId(null)
       setMessage('Order reset to unfulfilled. Get Shippo rates, then buy a live label.')
       await loadOrders(selected.id)
+      playUiSound('success')
     } catch (err) {
       console.error('[AdminOrders] reset fulfillment failed', err)
       setError(err instanceof Error ? err.message : 'Could not reset order')
+      playUiSound('soft')
     } finally {
       setBusy(false)
       setBusyLabel(null)
@@ -176,9 +180,11 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
       await markOrderFulfilledWithStamp(selected.id, packageType)
       setMessage('Marked as packed with stamp.')
       await loadOrders(selected.id)
+      playUiSound('success')
     } catch (err) {
       console.error('[AdminOrders] stamp fulfill failed', err)
       setError(err instanceof Error ? err.message : 'Could not mark order fulfilled')
+      playUiSound('soft')
     } finally {
       setBusy(false)
       setBusyLabel(null)
@@ -222,9 +228,11 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
           `Loaded ${result.rates.length} rate${result.rates.length === 1 ? '' : 's'} from Shippo. Pick one, then Buy & print label.`
         : 'Shippo returned no rates. Check SHIPPO_API_TOKEN and SHIP_FROM_* in .env / secrets.',
       )
+      playUiSound(result.rates.length > 0 ? 'success' : 'soft')
     } catch (err) {
       console.error('[AdminOrders] get rates failed', err)
       setError(err instanceof Error ? err.message : 'Could not load shipping rates')
+      playUiSound('soft')
     } finally {
       setBusy(false)
       setBusyLabel(null)
@@ -279,9 +287,11 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
           .join(' '),
       )
       await loadOrders(selected.id)
+      playUiSound('success')
     } catch (err) {
       console.error('[AdminOrders] buy label failed', err)
       setError(err instanceof Error ? err.message : 'Could not purchase label')
+      playUiSound('soft')
     } finally {
       setBusy(false)
       setBusyLabel(null)
@@ -300,14 +310,20 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
             <button
               type="button"
               className={`admin-tab ${filter === 'unfulfilled' ? 'is-active' : ''}`}
-              onClick={() => setFilter('unfulfilled')}
+              onClick={() => {
+                uiClick('tap')
+                setFilter('unfulfilled')
+              }}
             >
               Unfulfilled
             </button>
             <button
               type="button"
               className={`admin-tab ${filter === 'all' ? 'is-active' : ''}`}
-              onClick={() => setFilter('all')}
+              onClick={() => {
+                uiClick('tap')
+                setFilter('all')
+              }}
             >
               All
             </button>
@@ -315,7 +331,10 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
           <button
             type="button"
             className="btn btn-ghost btn-sm"
-            onClick={() => void loadOrders(selectedId || undefined)}
+            onClick={() => {
+              uiClick('soft')
+              void loadOrders(selectedId || undefined)
+            }}
           >
             Refresh
           </button>
@@ -431,6 +450,7 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                   <select
                     value={packageType}
                     onChange={(e) => {
+                      uiClick('soft')
                       setPackageType(e.target.value as PackageType)
                       setRates([])
                       setSelectedRateId(null)
@@ -566,7 +586,10 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                             type="radio"
                             name="shippo-rate"
                             checked={selectedRateId === rate.objectId}
-                            onChange={() => setSelectedRateId(rate.objectId)}
+                            onChange={() => {
+                              uiClick('soft')
+                              setSelectedRateId(rate.objectId)
+                            }}
                           />
                           <span>
                             {rate.provider} {rate.service} — ${rate.amount}

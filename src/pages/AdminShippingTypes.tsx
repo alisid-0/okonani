@@ -6,6 +6,7 @@ import {
   listAdminShippingTypes,
   saveAdminShippingType,
 } from '../lib/adminApi'
+import { playUiSound } from '../lib/uiSounds'
 
 type LetterForm = {
   id: string
@@ -81,8 +82,10 @@ export default function AdminShippingTypes() {
       const letter = findLetterType(installed)
       if (letter) setForm(toForm(letter))
       setMessage('Installed letter shipping settings.')
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not install defaults')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -116,8 +119,10 @@ export default function AdminShippingTypes() {
       setMessage(`Saved untracked letter fee (${formatPrice(saved.baseRateCents)}).`)
       setForm(toForm(saved))
       await load()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save letter settings')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ProductMedia } from '../data/products'
+import { uiClick } from '../lib/uiSounds'
 import ProtectedImage from './ProtectedImage'
 
 type ProductGalleryProps = {
@@ -56,10 +57,12 @@ export default function ProductGallery({
   }, [activeIndex, items.length])
 
   function showPrevious() {
+    uiClick('soft')
     setActiveIndex((index) => (index <= 0 ? items.length - 1 : index - 1))
   }
 
   function showNext() {
+    uiClick('soft')
     setActiveIndex((index) => (index >= items.length - 1 ? 0 : index + 1))
   }
 
@@ -135,7 +138,10 @@ export default function ProductGallery({
               role="tab"
               aria-selected={index === activeIndex}
               className={`product-gallery-thumb ${index === activeIndex ? 'is-active' : ''}`}
-              onClick={() => setActiveIndex(index)}
+              onClick={() => {
+                uiClick('soft')
+                setActiveIndex(index)
+              }}
               aria-label={`Show media ${index + 1}`}
             >
               {item.type === 'image' ?

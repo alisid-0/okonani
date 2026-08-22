@@ -3,6 +3,7 @@ import {
   type ProductOptionGroup,
 } from '../data/productOptions'
 import { formatPrice } from '../data/products'
+import { uiClick } from '../lib/uiSounds'
 
 type ProductOptionTilesProps = {
   groups: ProductOptionGroup[]
@@ -42,7 +43,10 @@ export default function ProductOptionTiles({
                   role="radio"
                   aria-checked={checked}
                   className={`product-option-tile ${checked ? 'is-selected' : ''} ${showImage ? 'has-image' : ''}`}
-                  onClick={() => onSelect(group.id, choice.id, choice)}
+                  onClick={() => {
+                    uiClick('tap')
+                    onSelect(group.id, choice.id, choice)
+                  }}
                 >
                   {showImage ?
                     <img

@@ -6,6 +6,7 @@ import {
 } from '../data/productOptions'
 import type { ProductMedia } from '../data/products'
 import { uploadProductImages } from '../lib/storageUpload'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type ProductOptionsEditorProps = {
   groups: ProductOptionGroup[]
@@ -106,8 +107,10 @@ export default function ProductOptionsEditor({
       const url = uploaded[0]?.url
       if (!url) throw new Error('Upload did not return an image URL')
       updateChoice(groupIndex, choiceIndex, { imageUrl: url })
+      playUiSound('success')
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Could not upload image')
+      playUiSound('soft')
     } finally {
       setUploadingKey(null)
     }
@@ -181,6 +184,7 @@ export default function ProductOptionsEditor({
                         `Delete option type “${group.name.trim() || 'Untitled'}” and all its choices?`,
                       )
                     ) {
+                      uiClick('soft')
                       removeGroup(groupIndex)
                     }
                   }}
@@ -296,9 +300,10 @@ export default function ProductOptionsEditor({
                             type="button"
                             className="admin-option-text-btn"
                             disabled={disabled}
-                            onClick={() =>
+                            onClick={() => {
+                              uiClick('soft')
                               updateChoice(groupIndex, choiceIndex, { imageUrl: '' })
-                            }
+                            }}
                           >
                             Clear tile image
                           </button>
@@ -314,6 +319,7 @@ export default function ProductOptionsEditor({
                                 `Delete choice “${choice.label.trim() || 'Untitled'}”?`,
                               )
                             ) {
+                              uiClick('soft')
                               removeChoice(groupIndex, choiceIndex)
                             }
                           }}
@@ -340,9 +346,10 @@ export default function ProductOptionsEditor({
                                     className={`admin-option-media-thumb ${isTile || isLinked ? 'is-active' : ''}`}
                                     disabled={disabled}
                                     title="Use as tile image and gallery jump"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      uiClick('soft')
                                       assignProductPhoto(groupIndex, choiceIndex, media)
-                                    }
+                                    }}
                                   >
                                     <img src={media.url} alt="" />
                                     {(isTile || isLinked) && (
@@ -372,11 +379,12 @@ export default function ProductOptionsEditor({
                                     className={`admin-option-media-thumb ${isLinked ? 'is-linked' : ''}`}
                                     disabled={disabled}
                                     title="Jump gallery to this photo when selected"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      uiClick('soft')
                                       updateChoice(groupIndex, choiceIndex, {
                                         linkedMediaId: isLinked ? undefined : media.id,
                                       })
-                                    }
+                                    }}
                                   >
                                     <img src={media.url} alt="" />
                                   </button>
@@ -388,11 +396,12 @@ export default function ProductOptionsEditor({
                                 type="button"
                                 className="admin-option-text-btn"
                                 disabled={disabled}
-                                onClick={() =>
+                                onClick={() => {
+                                  uiClick('soft')
                                   updateChoice(groupIndex, choiceIndex, {
                                     linkedMediaId: undefined,
                                   })
-                                }
+                                }}
                               >
                                 Clear gallery jump
                               </button>
@@ -412,11 +421,12 @@ export default function ProductOptionsEditor({
                                     className={`admin-option-media-thumb ${isTile ? 'is-tile' : ''}`}
                                     disabled={disabled}
                                     title="Use as tile image only"
-                                    onClick={() =>
+                                    onClick={() => {
+                                      uiClick('soft')
                                       updateChoice(groupIndex, choiceIndex, {
                                         imageUrl: media.url,
                                       })
-                                    }
+                                    }}
                                   >
                                     <img src={media.url} alt="" />
                                   </button>
@@ -436,9 +446,10 @@ export default function ProductOptionsEditor({
               type="button"
               className="admin-option-secondary-btn"
               disabled={disabled}
-              onClick={() =>
+              onClick={() => {
+                uiClick('soft')
                 updateGroup(groupIndex, { choices: [...group.choices, emptyOptionChoice()] })
-              }
+              }}
             >
               + Add choice
             </button>
@@ -450,7 +461,10 @@ export default function ProductOptionsEditor({
         type="button"
         className="admin-option-secondary-btn"
         disabled={disabled}
-        onClick={() => onChange([...groups, emptyOptionGroup()])}
+        onClick={() => {
+          uiClick('tap')
+          onChange([...groups, emptyOptionGroup()])
+        }}
       >
         + Add option type
       </button>

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/products'
 import { getUserProfile, setNotificationPreference } from '../lib/userApi'
 import { getRewardsSummary, redeemPoints, type RewardsSummary } from '../lib/rewardsApi'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 export default function Account() {
   const { user, loading: authLoading, logOut } = useAuth()
@@ -79,8 +80,10 @@ export default function Account() {
       await setNotificationPreference(uid, email, enabled)
       setNotificationsEnabled(enabled)
       setMessage(enabled ? 'You are subscribed to product updates.' : 'Notifications turned off.')
+      playUiSound('success')
     } catch {
       setError('Could not update notification preference.')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -97,8 +100,10 @@ export default function Account() {
         `Redeemed ${result.pointsSpent} points for code ${result.code}. Use it at checkout or apply automatically from your cart.`,
       )
       await loadRewards()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not redeem points.')
+      playUiSound('soft')
     } finally {
       setRedeeming(false)
     }
@@ -183,10 +188,17 @@ export default function Account() {
       {error && <p className="form-error">{error}</p>}
 
       <div className="account-actions">
-        <Link to="/store" className="btn btn-outline">
+        <Link to="/store" className="btn btn-outline" onClick={() => uiClick('soft')}>
           Continue shopping
         </Link>
-        <button type="button" className="btn btn-ghost" onClick={() => logOut()}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            uiClick('soft')
+            void logOut()
+          }}
+        >
           Log out
         </button>
       </div>

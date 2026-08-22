@@ -13,6 +13,7 @@ import {
   DEFAULT_SHOP_PAUSED_TITLE,
   useSiteSettings,
 } from '../data/siteSettings'
+import { uiClick } from '../lib/uiSounds'
 
 const SESSION_KEY = 'okonani-shop-paused-modal-seen'
 
@@ -46,7 +47,14 @@ export function ShopPausedModal({
       <div className="shop-paused-modal-panel">
         <h2 id="shop-paused-title">{title || DEFAULT_SHOP_PAUSED_TITLE}</h2>
         <p>{message || DEFAULT_SHOP_PAUSED_MESSAGE}</p>
-        <button type="button" className="btn btn-primary" onClick={onClose}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => {
+            uiClick('soft')
+            onClose()
+          }}
+        >
           OK
         </button>
       </div>

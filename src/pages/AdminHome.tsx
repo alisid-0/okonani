@@ -1,9 +1,12 @@
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import {
   DEFAULT_HOME_LAYOUT,
   DEFAULT_SITE_SETTINGS,
+  emptyHomeSection,
+  resolveHomeSections,
   type HomeCollectionItem,
   type HomeLayoutSettings,
+  type HomeSection,
   type SiteSettings,
 } from '../data/siteSettings'
 import type { StoreCategory } from '../data/categories'
@@ -11,26 +14,33 @@ import type { ProductType } from '../data/productTypes'
 import {
   getSiteSettings,
   listAdminCategories,
+  listAdminProducts,
   listAdminProductTypes,
   saveAdminCategory,
   saveSiteSettings,
+  type AdminProduct,
 } from '../lib/adminApi'
 import { uploadProductImages } from '../lib/storageUpload'
+import { playUiSound } from '../lib/uiSounds'
 
-type CategoryHomeRow = {
-  id: string
-  name: string
-  showOnHome: boolean
-  homeProductLimit: number
-  showInStore: boolean
-  active: boolean
-  description: string
-  sortOrder: number
+type CategoryHomeRow = StoreCategory
+
+function seedSectionsFromLegacy(
+  home: HomeLayoutSettings,
+  categories: CategoryHomeRow[],
+): HomeSection[] {
+  if (home.sections.length > 0) return home.sections
+  return resolveHomeSections(home, categories).map((section, index) => ({
+    ...section,
+    id: section.id.startsWith('legacy-') ? emptyHomeSection(section.kind, section.sourceId).id : section.id,
+    sortOrder: index,
+  }))
 }
 
 export default function AdminHome() {
   const [categories, setCategories] = useState<CategoryHomeRow[]>([])
   const [productTypes, setProductTypes] = useState<ProductType[]>([])
+  const [products, setProducts] = useState<AdminProduct[]>([])
   const [home, setHome] = useState<HomeLayoutSettings>({ ...DEFAULT_HOME_LAYOUT })
   const [pagesSnapshot, setPagesSnapshot] = useState<Pick<
     SiteSettings,
@@ -46,15 +56,18 @@ export default function AdminHome() {
   const [uploadingTypeId, setUploadingTypeId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [addKind, setAddKind] = useState<'category' | 'productType' | 'collections'>('category')
+  const [addSourceId, setAddSourceId] = useState('')
 
   async function load() {
     setLoading(true)
     setError(null)
     try {
-      const [settings, cats, types] = await Promise.all([
+      const [settings, cats, types, productList] = await Promise.all([
         getSiteSettings(),
         listAdminCategories(),
         listAdminProductTypes(),
+        listAdminProducts(),
       ])
       setPagesSnapshot({
         pages: settings.pages,
@@ -64,20 +77,17 @@ export default function AdminHome() {
         shoppingPausedTitle: settings.shoppingPausedTitle,
         shoppingPausedMessage: settings.shoppingPausedMessage,
       })
-      setHome({ ...DEFAULT_HOME_LAYOUT, ...settings.home })
-      setCategories(
-        cats.map((category) => ({
-          id: category.id,
-          name: category.name,
-          showOnHome: category.showOnHome,
-          homeProductLimit: category.homeProductLimit,
-          showInStore: category.showInStore,
-          active: category.active,
-          description: category.description,
-          sortOrder: category.sortOrder,
-        })),
-      )
+      const nextCats = cats.filter((category) => category.active)
+      setCategories(nextCats)
       setProductTypes(types.filter((type) => type.active))
+      setProducts(productList.products.filter((product) => product.active !== false))
+      const seededSections = seedSectionsFromLegacy(settings.home, nextCats)
+      setHome({
+        ...DEFAULT_HOME_LAYOUT,
+        ...settings.home,
+        sections: seededSections,
+      })
+      setAddSourceId(nextCats[0]?.id ?? '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load home settings')
     } finally {
@@ -89,8 +99,71 @@ export default function AdminHome() {
     void load()
   }, [])
 
-  function updateCategory(id: string, patch: Partial<CategoryHomeRow>) {
-    setCategories((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+  const orderedSections = useMemo(
+    () => [...home.sections].sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)),
+    [home.sections],
+  )
+
+  function setSections(next: HomeSection[]) {
+    setHome((prev) => ({
+      ...prev,
+      sections: next.map((section, index) => ({ ...section, sortOrder: index })),
+    }))
+  }
+
+  function updateSection(id: string, patch: Partial<HomeSection>) {
+    setSections(
+      orderedSections.map((section) => (section.id === id ? { ...section, ...patch } : section)),
+    )
+  }
+
+  function moveSection(id: string, direction: -1 | 1) {
+    const index = orderedSections.findIndex((section) => section.id === id)
+    if (index < 0) return
+    const target = index + direction
+    if (target < 0 || target >= orderedSections.length) return
+    const next = [...orderedSections]
+    const [item] = next.splice(index, 1)
+    next.splice(target, 0, item)
+    playUiSound('tap')
+    setSections(next)
+  }
+
+  function removeSection(id: string) {
+    if (!window.confirm('Remove this home section?')) return
+    playUiSound('tap')
+    setSections(orderedSections.filter((section) => section.id !== id))
+  }
+
+  function addSection() {
+    if (addKind === 'collections') {
+      if (orderedSections.some((section) => section.kind === 'collections')) {
+        setError('You already have a collections section. Toggle it on instead of adding another.')
+        return
+      }
+      const section = emptyHomeSection('collections')
+      section.title = home.collectionsTitle
+      section.lead = home.collectionsLead
+      playUiSound('success')
+      setSections([...orderedSections, section])
+      setError(null)
+      return
+    }
+
+    if (!addSourceId) {
+      setError(addKind === 'category' ? 'Choose a category first.' : 'Choose a product type first.')
+      return
+    }
+
+    const section = emptyHomeSection(addKind, addSourceId)
+    if (addKind === 'category') {
+      const category = categories.find((item) => item.id === addSourceId)
+      section.productLimit = category?.homeProductLimit ?? 4
+      section.lead = category?.description ?? ''
+    }
+    playUiSound('success')
+    setSections([...orderedSections, section])
+    setError(null)
   }
 
   function collectionForType(productTypeId: string): HomeCollectionItem | undefined {
@@ -135,11 +208,38 @@ export default function AdminHome() {
       const url = uploaded[0]?.url
       if (!url) throw new Error('Upload did not return an image URL')
       upsertCollection(productTypeId, { imageUrl: url }, true)
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not upload collection image')
     } finally {
       setUploadingTypeId(null)
     }
+  }
+
+  function productsForSection(section: HomeSection): AdminProduct[] {
+    if (section.kind === 'category') {
+      return products.filter((product) => product.category === section.sourceId)
+    }
+    if (section.kind === 'productType') {
+      return products.filter((product) => product.productTypeId === section.sourceId)
+    }
+    return []
+  }
+
+  function toggleProductPick(section: HomeSection, productId: string) {
+    const selected = new Set(section.productIds)
+    if (selected.has(productId)) selected.delete(productId)
+    else selected.add(productId)
+    playUiSound('tap')
+    updateSection(section.id, { productIds: [...selected] })
+  }
+
+  function sectionLabel(section: HomeSection): string {
+    if (section.kind === 'collections') return 'Collections grid'
+    if (section.kind === 'category') {
+      return categories.find((item) => item.id === section.sourceId)?.name ?? section.sourceId
+    }
+    return productTypes.find((item) => item.id === section.sourceId)?.name ?? section.sourceId
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -158,25 +258,34 @@ export default function AdminHome() {
         shoppingPausedMessage: DEFAULT_SITE_SETTINGS.shoppingPausedMessage,
       }
 
+      const enabledCategoryIds = new Set(
+        orderedSections
+          .filter((section) => section.kind === 'category' && section.enabled && section.sourceId)
+          .map((section) => section.sourceId),
+      )
+
       await Promise.all(
-        categories.map((category) =>
-          saveAdminCategory({
-            id: category.id,
-            name: category.name,
-            description: category.description,
-            showOnHome: category.showOnHome,
-            showInStore: category.showInStore,
-            homeProductLimit: category.homeProductLimit,
-            active: category.active,
-            sortOrder: category.sortOrder,
-          } satisfies StoreCategory),
-        ),
+        categories.map((category) => {
+          const matching = orderedSections.find(
+            (section) =>
+              section.kind === 'category' && section.sourceId === category.id && section.enabled,
+          )
+          return saveAdminCategory({
+            ...category,
+            showOnHome: enabledCategoryIds.has(category.id),
+            homeProductLimit: matching?.productLimit ?? category.homeProductLimit,
+          })
+        }),
       )
 
       await saveSiteSettings({
         ...base,
         home: {
           ...home,
+          sections: orderedSections,
+          collectionsEnabled: orderedSections.some(
+            (section) => section.kind === 'collections' && section.enabled,
+          ),
           collections: home.collections.map((item, index) => ({
             ...item,
             sortOrder: index,
@@ -184,6 +293,7 @@ export default function AdminHome() {
         },
       })
 
+      playUiSound('success')
       setMessage('Home page settings saved.')
       await load()
     } catch (err) {
@@ -207,6 +317,11 @@ export default function AdminHome() {
     )
   }
 
+  const sourceOptions =
+    addKind === 'category' ? categories
+    : addKind === 'productType' ? productTypes
+    : []
+
   return (
     <div className="admin-home">
       <header className="admin-main-header">
@@ -214,8 +329,8 @@ export default function AdminHome() {
           <p className="admin-main-eyebrow">Site</p>
           <h1>Home</h1>
           <p className="admin-main-lead">
-            Choose which category rows appear on the homepage, and optionally add a Shop by
-            collection grid that links into the store by product type.
+            Mix and match sections: category product rows, product-type rows, and a collections
+            tile grid. Toggle, reorder, set headers, limits, and optional product picks.
           </p>
         </div>
       </header>
@@ -227,52 +342,216 @@ export default function AdminHome() {
         <section className="admin-card">
           <div className="admin-card-header">
             <div>
-              <h2>Category rows</h2>
-              <p>
-                Each enabled category shows a product strip on the home page. Create and order
-                categories under Categories.
-              </p>
+              <h2>Home sections</h2>
+              <p>Order is top-to-bottom on the homepage. Disabled sections stay saved but hidden.</p>
             </div>
           </div>
 
-          {categories.length === 0 ?
-            <p className="admin-empty-copy">No categories yet. Add some under Categories first.</p>
-          : <ul className="admin-home-category-list">
-              {categories.map((category) => (
-                <li key={category.id} className="admin-home-category-row">
-                  <label className="admin-toggle">
-                    <input
-                      type="checkbox"
-                      checked={category.showOnHome}
-                      onChange={(e) =>
-                        updateCategory(category.id, { showOnHome: e.target.checked })
-                      }
-                    />
-                    <span>
-                      <strong>{category.name}</strong>
-                      <small>{category.id}</small>
-                    </span>
-                  </label>
-                  <label className="admin-home-limit">
-                    Products shown
-                    <input
-                      type="number"
-                      min={1}
-                      max={24}
-                      disabled={!category.showOnHome}
-                      value={category.homeProductLimit}
-                      onChange={(e) =>
-                        updateCategory(category.id, {
-                          homeProductLimit: Math.min(
-                            24,
-                            Math.max(1, Number.parseInt(e.target.value, 10) || 4),
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                </li>
-              ))}
+          <div className="admin-home-add-row">
+            <label>
+              Add section
+              <select
+                value={addKind}
+                onChange={(e) => {
+                  const kind = e.target.value as typeof addKind
+                  setAddKind(kind)
+                  if (kind === 'category') setAddSourceId(categories[0]?.id ?? '')
+                  else if (kind === 'productType') setAddSourceId(productTypes[0]?.id ?? '')
+                  else setAddSourceId('')
+                }}
+              >
+                <option value="category">Category products</option>
+                <option value="productType">Product type products</option>
+                <option value="collections">Collections grid</option>
+              </select>
+            </label>
+            {addKind !== 'collections' && (
+              <label>
+                {addKind === 'category' ? 'Category' : 'Product type'}
+                <select value={addSourceId} onChange={(e) => setAddSourceId(e.target.value)}>
+                  {sourceOptions.length === 0 && <option value="">None available</option>}
+                  {sourceOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button type="button" className="btn btn-outline" onClick={addSection}>
+              + Add
+            </button>
+          </div>
+
+          {orderedSections.length === 0 ?
+            <p className="admin-empty-copy">No sections yet. Add a category, product type, or collections block.</p>
+          : <ul className="admin-home-section-list">
+              {orderedSections.map((section, index) => {
+                const pool = productsForSection(section)
+                return (
+                  <li
+                    key={section.id}
+                    className={`admin-home-section-card ${section.enabled ? '' : 'is-disabled'}`.trim()}
+                  >
+                    <div className="admin-home-section-top">
+                      <label className="admin-toggle">
+                        <input
+                          type="checkbox"
+                          checked={section.enabled}
+                          onChange={(e) => {
+                            playUiSound('tap')
+                            updateSection(section.id, { enabled: e.target.checked })
+                          }}
+                        />
+                        <span>
+                          <strong>
+                            {section.kind === 'collections' ?
+                              'Collections'
+                            : section.kind === 'category' ?
+                              'Category'
+                            : 'Product type'}
+                            : {sectionLabel(section)}
+                          </strong>
+                          <small>{section.kind}</small>
+                        </span>
+                      </label>
+                      <div className="admin-home-section-move">
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={index === 0}
+                          onClick={() => moveSection(section.id, -1)}
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={index === orderedSections.length - 1}
+                          onClick={() => moveSection(section.id, 1)}
+                        >
+                          Down
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => removeSection(section.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="admin-home-section-fields">
+                      <label>
+                        Header title
+                        <input
+                          value={section.title}
+                          disabled={!section.enabled}
+                          placeholder={sectionLabel(section)}
+                          onChange={(e) => updateSection(section.id, { title: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Supporting text
+                        <input
+                          value={section.lead}
+                          disabled={!section.enabled || section.showDescription === false}
+                          placeholder={
+                            section.kind === 'collections'
+                              ? 'Optional override'
+                              : 'Leave blank to use category/type description'
+                          }
+                          onChange={(e) => updateSection(section.id, { lead: e.target.value })}
+                        />
+                      </label>
+                      <label className="admin-toggle admin-home-show-description">
+                        <input
+                          type="checkbox"
+                          checked={section.showDescription !== false}
+                          disabled={!section.enabled}
+                          onChange={(e) => {
+                            playUiSound('tap')
+                            updateSection(section.id, { showDescription: e.target.checked })
+                          }}
+                        />
+                        <span>
+                          <strong>Show description</strong>
+                          <small>
+                            {section.kind === 'collections'
+                              ? 'Supporting text under the collections title'
+                              : 'Category or product type description under the header'}
+                          </small>
+                        </span>
+                      </label>
+                      {section.kind !== 'collections' && (
+                        <label className="admin-home-limit">
+                          Products shown
+                          <input
+                            type="number"
+                            min={1}
+                            max={24}
+                            disabled={!section.enabled}
+                            value={section.productLimit}
+                            onChange={(e) =>
+                              updateSection(section.id, {
+                                productLimit: Math.min(
+                                  24,
+                                  Math.max(1, Number.parseInt(e.target.value, 10) || 4),
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {section.kind !== 'collections' && section.enabled && (
+                      <div className="admin-home-product-picks">
+                        <p className="admin-field-hint">
+                          Optional picks: leave empty to show the first {section.productLimit} by
+                          store order. Checked products appear in check order, capped by the limit.
+                        </p>
+                        {pool.length === 0 ?
+                          <p className="admin-empty-copy">No products in this source yet.</p>
+                        : <ul className="admin-home-product-pick-list">
+                            {pool.map((product) => {
+                              const checked = section.productIds.includes(product.id)
+                              return (
+                                <li key={product.id}>
+                                  <label className="admin-toggle">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() => toggleProductPick(section, product.id)}
+                                    />
+                                    <span>
+                                      <strong>{product.name}</strong>
+                                      <small>{product.id}</small>
+                                    </span>
+                                  </label>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        }
+                        {section.productIds.length > 0 && (
+                          <button
+                            type="button"
+                            className="admin-option-text-btn"
+                            onClick={() => {
+                              playUiSound('soft')
+                              updateSection(section.id, { productIds: [] })
+                            }}
+                          >
+                            Clear picks (use automatic)
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           }
         </section>
@@ -280,46 +559,31 @@ export default function AdminHome() {
         <section className="admin-card">
           <div className="admin-card-header">
             <div>
-              <h2>Shop by collection</h2>
+              <h2>Collections tiles</h2>
               <p>
-                Show product types as clickable tiles. Each tile can have its own image and opens
-                the store filtered to that type.
+                Used by any Collections section. Each tile links to the store filtered by product
+                type.
               </p>
             </div>
           </div>
 
-          <label className="admin-toggle">
-            <input
-              type="checkbox"
-              checked={home.collectionsEnabled}
-              onChange={(e) =>
-                setHome((prev) => ({ ...prev, collectionsEnabled: e.target.checked }))
-              }
-            />
-            <span>
-              <strong>Show collections section on home</strong>
-            </span>
-          </label>
-
           <div className="admin-home-collections-copy">
             <label>
-              Section title
+              Default collections title
               <input
                 value={home.collectionsTitle}
                 onChange={(e) =>
                   setHome((prev) => ({ ...prev, collectionsTitle: e.target.value }))
                 }
-                disabled={!home.collectionsEnabled}
               />
             </label>
             <label>
-              Supporting text
+              Default supporting text
               <input
                 value={home.collectionsLead}
                 onChange={(e) =>
                   setHome((prev) => ({ ...prev, collectionsLead: e.target.value }))
                 }
-                disabled={!home.collectionsEnabled}
                 placeholder="Optional short line under the title"
               />
             </label>
@@ -337,8 +601,10 @@ export default function AdminHome() {
                       <input
                         type="checkbox"
                         checked={enabled}
-                        disabled={!home.collectionsEnabled}
-                        onChange={(e) => upsertCollection(type.id, {}, e.target.checked)}
+                        onChange={(e) => {
+                          playUiSound('tap')
+                          upsertCollection(type.id, {}, e.target.checked)
+                        }}
                       />
                       <span>
                         <strong>{type.name}</strong>
@@ -350,7 +616,7 @@ export default function AdminHome() {
                       Tile label
                       <input
                         value={item?.label ?? type.name}
-                        disabled={!home.collectionsEnabled || !enabled}
+                        disabled={!enabled}
                         onChange={(e) => upsertCollection(type.id, { label: e.target.value }, true)}
                         placeholder={type.name}
                       />
@@ -367,12 +633,7 @@ export default function AdminHome() {
                             type="file"
                             accept="image/*"
                             hidden
-                            disabled={
-                              !home.collectionsEnabled ||
-                              !enabled ||
-                              uploadingTypeId === type.id ||
-                              saving
-                            }
+                            disabled={!enabled || uploadingTypeId === type.id || saving}
                             onChange={(e) => void handleUpload(type.id, e)}
                           />
                         </label>
@@ -380,8 +641,11 @@ export default function AdminHome() {
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
-                            disabled={!home.collectionsEnabled || !enabled}
-                            onClick={() => upsertCollection(type.id, { imageUrl: '' }, true)}
+                            disabled={!enabled}
+                            onClick={() => {
+                              playUiSound('soft')
+                              upsertCollection(type.id, { imageUrl: '' }, true)
+                            }}
                           >
                             Remove image
                           </button>

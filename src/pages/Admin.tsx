@@ -16,6 +16,7 @@ import {
 } from '../lib/adminApi'
 import { db } from '../lib/firebase'
 import { uploadProductImages } from '../lib/storageUpload'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 import ImageCropModal from '../components/ImageCropModal'
 import ProductOptionsEditorModal from '../components/ProductOptionsEditorModal'
 import ProductShopperPreviewModal from '../components/ProductShopperPreviewModal'
@@ -127,6 +128,7 @@ export default function Admin() {
   const initialOrderId = searchParams.get('order')
 
   function selectPanel(next: AdminPanel) {
+    uiClick('tap')
     setPanel(next)
     const params = new URLSearchParams(searchParams)
     params.set('panel', next)
@@ -155,7 +157,7 @@ export default function Admin() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const draftProductIdRef = useRef('')
 
-  async function loadProducts(selectId?: string) {
+  async function loadProducts(selectId?: string, opts?: { silentSelect?: boolean }) {
     setLoading(true)
     setError(null)
 
@@ -171,7 +173,7 @@ export default function Admin() {
 
       if (selectId) {
         const selected = data.products.find((product) => product.id === selectId)
-        if (selected) await selectProduct(selected)
+        if (selected) await selectProduct(selected, { silent: opts?.silentSelect })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load products')
@@ -184,7 +186,8 @@ export default function Admin() {
     loadProducts()
   }, [])
 
-  async function selectProduct(product: AdminProduct) {
+  async function selectProduct(product: AdminProduct, opts?: { silent?: boolean }) {
+    if (!opts?.silent) uiClick('tap')
     setTab('details')
     setMessage(null)
     setError(null)
@@ -248,7 +251,8 @@ export default function Admin() {
     }
   }
 
-  function backToProductList() {
+  function backToProductList(opts?: { silent?: boolean }) {
+    if (!opts?.silent) uiClick('soft')
     setProductMode('list')
     setForm(emptyForm())
     draftProductIdRef.current = ''
@@ -257,6 +261,7 @@ export default function Admin() {
   }
 
   function startCreate() {
+    uiClick('tap')
     const nextId = createProductId()
     draftProductIdRef.current = nextId
     setProductMode('edit')
@@ -282,6 +287,7 @@ export default function Admin() {
 
     if (!form.name.trim()) {
       setError('Enter a product name before saving.')
+      playUiSound('soft')
       setSaving(false)
       return
     }
@@ -309,9 +315,11 @@ export default function Admin() {
         optionGroups: form.optionGroups,
       })
       setMessage(`Saved "${data.product.name}" and synced to Stripe.`)
-      await loadProducts(data.product.id)
+      await loadProducts(data.product.id, { silentSelect: true })
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save product')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -419,9 +427,11 @@ export default function Admin() {
 
     if (!cropSource) {
       setError('Add an image URL before cropping.')
+      playUiSound('soft')
       return
     }
 
+    uiClick('tap')
     setError(null)
     setMessage(null)
     setCropQueue([{ kind: 'existing', source: cropSource, mediaIndex }])
@@ -466,12 +476,14 @@ export default function Admin() {
   }
 
   function toggleSelected(productId: string) {
+    uiClick('soft')
     setSelectedIds((prev) =>
       prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
     )
   }
 
   function toggleSelectAll() {
+    uiClick('soft')
     setSelectedIds((prev) => (prev.length === products.length ? [] : products.map((product) => product.id)))
   }
 
@@ -490,8 +502,10 @@ export default function Admin() {
       setSelectedIds([])
       setBatchProductTypeId('')
       await loadProducts()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Batch update failed')
+      playUiSound('soft')
     } finally {
       setBatchBusy(false)
     }
@@ -509,8 +523,10 @@ export default function Admin() {
       setSelectedIds([])
       setBatchCategoryId('')
       await loadProducts()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Batch update failed')
+      playUiSound('soft')
     } finally {
       setBatchBusy(false)
     }
@@ -528,8 +544,10 @@ export default function Admin() {
       )
       setSelectedIds([])
       await loadProducts()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Batch update failed')
+      playUiSound('soft')
     } finally {
       setBatchBusy(false)
     }
@@ -547,10 +565,12 @@ export default function Admin() {
       await deleteAdminProduct(product.id, product.stripePriceId, product.stripeProductId)
       setMessage(`Removed "${product.name}".`)
       setSelectedIds((prev) => prev.filter((id) => id !== product.id))
-      backToProductList()
+      backToProductList({ silent: true })
       await loadProducts()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove product')
+      playUiSound('soft')
     }
   }
 
@@ -566,6 +586,7 @@ export default function Admin() {
       const next = [...prev.media]
       const target = index + direction
       if (target < 0 || target >= next.length) return prev
+      uiClick('soft')
       ;[next[index], next[target]] = [next[target], next[index]]
       return { ...prev, media: next }
     })
@@ -691,10 +712,17 @@ export default function Admin() {
         <div className="admin-sidebar-fill" aria-hidden="true" />
 
         <div className="admin-sidebar-footer">
-          <Link to="/store" className="admin-footer-link">
+          <Link to="/store" className="admin-footer-link" onClick={() => uiClick('soft')}>
             View storefront
           </Link>
-          <button type="button" className="admin-footer-link" onClick={() => logOut()}>
+          <button
+            type="button"
+            className="admin-footer-link"
+            onClick={() => {
+              uiClick('soft')
+              void logOut()
+            }}
+          >
             Log out
           </button>
         </div>
@@ -727,7 +755,14 @@ export default function Admin() {
                 </p>
               </div>
               <div className="admin-main-actions">
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void loadProducts()}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    uiClick('soft')
+                    void loadProducts()
+                  }}
+                >
                   Refresh
                 </button>
                 <button type="button" className="btn btn-primary btn-sm" onClick={startCreate}>
@@ -743,7 +778,14 @@ export default function Admin() {
               <div className="admin-products-bulk admin-card">
                 <div className="admin-products-bulk-top">
                   <strong>{selectedIds.length} selected</strong>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedIds([])}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      uiClick('soft')
+                      setSelectedIds([])
+                    }}
+                  >
                     Clear
                   </button>
                 </div>
@@ -891,7 +933,7 @@ export default function Admin() {
         : <>
         <header className="admin-main-header">
           <div>
-            <button type="button" className="admin-back-link" onClick={backToProductList}>
+            <button type="button" className="admin-back-link" onClick={() => backToProductList()}>
               ← Back to products
             </button>
             <p className="admin-main-eyebrow">
@@ -922,7 +964,10 @@ export default function Admin() {
                 key={item}
                 type="button"
                 className={`admin-tab ${tab === item ? 'is-active' : ''}`}
-                onClick={() => setTab(item)}
+                onClick={() => {
+                  uiClick('tap')
+                  setTab(item)
+                }}
               >
                 {item === 'details' ? 'Details' : 'Gallery & media'}
               </button>
@@ -1151,7 +1196,10 @@ export default function Admin() {
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"
-                          onClick={() => setOptionsOpen(true)}
+                          onClick={() => {
+                            uiClick('tap')
+                            setOptionsOpen(true)
+                          }}
                         >
                           Edit options
                         </button>
@@ -1163,7 +1211,10 @@ export default function Admin() {
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => setPreviewOpen(true)}
+                      onClick={() => {
+                        uiClick('tap')
+                        setPreviewOpen(true)
+                      }}
                       disabled={!form.name.trim()}
                     >
                       Preview shopper view
@@ -1254,7 +1305,10 @@ export default function Admin() {
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
-                    onClick={() => setForm((prev) => ({ ...prev, media: [...prev.media, newMediaItem('video')] }))}
+                    onClick={() => {
+                      uiClick('soft')
+                      setForm((prev) => ({ ...prev, media: [...prev.media, newMediaItem('video')] }))
+                    }}
                   >
                     + Video URL
                   </button>
@@ -1350,12 +1404,13 @@ export default function Admin() {
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
-                        onClick={() =>
+                        onClick={() => {
+                          uiClick('soft')
                           setForm((prev) => ({
                             ...prev,
                             media: prev.media.filter((_, itemIndex) => itemIndex !== index),
                           }))
-                        }
+                        }}
                       >
                         Remove
                       </button>
@@ -1367,7 +1422,7 @@ export default function Admin() {
           )}
 
           <footer className="admin-editor-footer">
-            <button type="button" className="btn btn-ghost" onClick={backToProductList}>
+            <button type="button" className="btn btn-ghost" onClick={() => backToProductList()}>
               Cancel
             </button>
             {form.id && products.some((item) => item.id === form.id) && (

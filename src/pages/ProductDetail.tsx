@@ -28,6 +28,7 @@ import {
 import { getProductTypeById, useProductTypes } from '../data/productTypes'
 import { deleteAdminProductReview } from '../lib/adminApi'
 import { deleteOwnProductReview } from '../lib/userApi'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 function formatReviewDate(value: string | null): string {
   if (!value) return ''
@@ -119,6 +120,7 @@ export default function ProductDetail() {
       const validationError = validateSelectedOptions(optionGroups, selectedByGroupId)
       if (validationError) {
         setOptionsError(validationError)
+        playUiSound('soft')
         return
       }
       const nextSelected = buildSelectedOptions(optionGroups, selectedByGroupId)
@@ -141,9 +143,11 @@ export default function ProductDetail() {
         await deleteOwnProductReview(productId, reviewUserId)
       }
       setReviewVersion((v) => v + 1)
+      playUiSound('success')
     } catch (err) {
       console.error('[ProductDetail] delete review failed', err)
       window.alert(err instanceof Error ? err.message : 'Could not delete review')
+      playUiSound('soft')
     } finally {
       setDeletingReviewId(null)
     }
@@ -333,7 +337,10 @@ export default function ProductDetail() {
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={reviewPage <= 1}
-                onClick={() => setReviewPage((page) => page - 1)}
+                onClick={() => {
+                  uiClick('soft')
+                  setReviewPage((page) => page - 1)
+                }}
               >
                 Previous
               </button>
@@ -344,7 +351,10 @@ export default function ProductDetail() {
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={reviewPage >= totalReviewPages}
-                onClick={() => setReviewPage((page) => page + 1)}
+                onClick={() => {
+                  uiClick('soft')
+                  setReviewPage((page) => page + 1)
+                }}
               >
                 Next
               </button>

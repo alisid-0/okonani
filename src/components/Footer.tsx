@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { SITE_NAV_PAGES, useSiteSettings } from '../data/siteSettings'
+import { uiClick } from '../lib/uiSounds'
 
 export default function Footer() {
   const { settings } = useSiteSettings()
@@ -15,7 +16,7 @@ export default function Footer() {
         {visiblePages.length > 0 && (
           <nav className="footer-nav" aria-label="Footer">
             {visiblePages.map((page) => (
-              <Link key={page.id} to={page.to}>
+              <Link key={page.id} to={page.to} onClick={() => uiClick('soft')}>
                 {page.label}
               </Link>
             ))}

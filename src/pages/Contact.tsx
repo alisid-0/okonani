@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import PageHeader from '../components/PageHeader'
 import { submitContactMessage } from '../lib/userApi'
+import { playUiSound, unlockUiSounds } from '../lib/uiSounds'
 
 export default function Contact() {
   const [name, setName] = useState('')
@@ -12,6 +13,7 @@ export default function Contact() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    unlockUiSounds()
     setSending(true)
     setError(null)
     setSuccess(false)
@@ -22,15 +24,25 @@ export default function Contact() {
       setName('')
       setEmail('')
       setMessage('')
+      playUiSound('success')
     } catch {
       setError('Could not send your message. Please try again.')
+      playUiSound('soft')
     } finally {
       setSending(false)
     }
   }
 
+  function handleFieldFocus() {
+    unlockUiSounds()
+    playUiSound('soft')
+  }
+
   return (
-    <div className="page page-narrow page-contact notebook-page">
+    <div
+      className="page page-narrow page-contact notebook-page"
+      onPointerDown={() => unlockUiSounds()}
+    >
       <PageHeader
         title="Contact"
         subtitle="Questions, custom orders, or just saying hi! I'd love to hear from you."
@@ -52,6 +64,7 @@ export default function Contact() {
               name="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onFocus={handleFieldFocus}
               placeholder="Your name"
               required
             />
@@ -63,6 +76,7 @@ export default function Contact() {
               name="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onFocus={handleFieldFocus}
               placeholder="you@example.com"
               required
             />
@@ -74,6 +88,7 @@ export default function Contact() {
               rows={5}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              onFocus={handleFieldFocus}
               placeholder="How can we help?"
               required
             />

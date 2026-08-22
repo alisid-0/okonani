@@ -7,6 +7,7 @@ import {
   updateCategorySortOrders,
 } from '../lib/adminApi'
 import type { StoreCategory } from '../data/categories'
+import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type CategoryForm = {
   id: string
@@ -63,12 +64,14 @@ export default function AdminCategories() {
   }, [])
 
   function startCreate() {
+    uiClick('tap')
     setForm(emptyCategoryForm())
     setMessage(null)
     setError(null)
   }
 
   function startEdit(category: StoreCategory) {
+    uiClick('tap')
     setForm({
       id: category.id,
       name: category.name,
@@ -105,8 +108,10 @@ export default function AdminCategories() {
       setMessage(`Saved category "${form.name}".`)
       setForm(emptyCategoryForm())
       await loadCategories()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save category')
+      playUiSound('soft')
     } finally {
       setSaving(false)
     }
@@ -126,8 +131,10 @@ export default function AdminCategories() {
       setMessage(`Removed "${category.name}".`)
       if (form.id === category.id) setForm(emptyCategoryForm())
       await loadCategories()
+      playUiSound('success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove category')
+      playUiSound('soft')
     }
   }
 
@@ -143,9 +150,11 @@ export default function AdminCategories() {
       setCategories(ordered)
       await updateCategorySortOrders(ordered.map((category) => category.id))
       setMessage('Category order updated.')
+      playUiSound('soft')
     } catch (err) {
       setCategories(previousCategories)
       setError(err instanceof Error ? err.message : 'Could not update category order')
+      playUiSound('soft')
     } finally {
       setReordering(false)
     }

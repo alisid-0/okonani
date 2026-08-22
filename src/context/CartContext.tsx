@@ -14,6 +14,7 @@ import {
   unitPriceWithOptions,
   type SelectedProductOption,
 } from '../data/productOptions'
+import { playUiSound, unlockUiSounds } from '../lib/uiSounds'
 import { useShopPause } from './ShopPauseContext'
 
 export type CartLine = {
@@ -165,14 +166,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (maxForProduct < 1) return
 
       const lineKey = lineKeyForOptions(product.id, selectedOptions)
-      setLinesByKey((prev) => {
-        const usedElsewhere = sumQuantityForProduct(prev, product.id, lineKey)
-        const room = Math.max(0, maxForProduct - usedElsewhere)
-        if (room < 1) return prev
+      const usedElsewhere = sumQuantityForProduct(linesByKey, product.id, lineKey)
+      const room = Math.max(0, maxForProduct - usedElsewhere)
+      if (room < 1) return
 
-        const currentQty = prev[lineKey]?.quantity ?? 0
-        const nextQty = Math.min(room, currentQty + 1)
-        if (nextQty < 1) return prev
+      const currentQty = linesByKey[lineKey]?.quantity ?? 0
+      const nextQty = Math.min(room, currentQty + 1)
+      if (nextQty <= currentQty) return
+
+      unlockUiSounds()
+      playUiSound('add')
+
+      setLinesByKey((prev) => {
+        const usedNow = sumQuantityForProduct(prev, product.id, lineKey)
+        const roomNow = Math.max(0, maxForProduct - usedNow)
+        if (roomNow < 1) return prev
+
+        const qtyNow = prev[lineKey]?.quantity ?? 0
+        const qtyNext = Math.min(roomNow, qtyNow + 1)
+        if (qtyNext <= qtyNow) return prev
 
         return {
           ...prev,
@@ -180,15 +192,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
             lineKey,
             product,
             selectedOptions,
-            quantity: nextQty,
+            quantity: qtyNext,
           },
         }
       })
     },
-    [shoppingPaused, showPausedModal],
+    [shoppingPaused, showPausedModal, linesByKey],
   )
 
   const removeItem = useCallback((lineKey: string) => {
+    unlockUiSounds()
+    playUiSound('soft')
     setLinesByKey((prev) => {
       const next = { ...prev }
       delete next[lineKey]
@@ -202,6 +216,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         showPausedModal()
         return
       }
+
+      unlockUiSounds()
+      playUiSound('soft')
 
       if (quantity < 1) {
         setLinesByKey((prev) => {

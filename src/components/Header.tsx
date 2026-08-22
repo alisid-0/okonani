@@ -4,6 +4,7 @@ import logoMark from '../assets/hero/Untitled_Artwork(3).png'
 import { SITE_NAV_PAGES, useSiteSettings } from '../data/siteSettings'
 import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
+import { uiClick } from '../lib/uiSounds'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   isActive ? 'nav-link active' : 'nav-link'
@@ -78,7 +79,14 @@ export default function Header() {
   return (
     <header className="header">
       <div className="header-inner">
-        <NavLink to="/" className="logo" onClick={closeMenu}>
+        <NavLink
+          to="/"
+          className="logo"
+          onClick={() => {
+            uiClick('soft')
+            closeMenu()
+          }}
+        >
           <img
             src={logoMark}
             alt="okonani home"
@@ -96,7 +104,10 @@ export default function Header() {
             aria-expanded={menuOpen}
             aria-controls="site-nav"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => {
+              uiClick('tap')
+              setMenuOpen((open) => !open)
+            }}
           >
             <MenuIcon open={menuOpen} />
           </button>
@@ -108,7 +119,13 @@ export default function Header() {
             onClick={closeMenu}
           >
             {visiblePages.map((page) => (
-              <NavLink key={page.id} to={page.to} end={page.end} className={navLinkClass}>
+              <NavLink
+                key={page.id}
+                to={page.to}
+                end={page.end}
+                className={navLinkClass}
+                onClick={() => uiClick('tap')}
+              >
                 {page.label}
               </NavLink>
             ))}
@@ -119,7 +136,10 @@ export default function Header() {
               to="/cart"
               className={iconLinkClass}
               aria-label={itemCount > 0 ? `Cart, ${itemCount} items` : 'Cart'}
-              onClick={closeMenu}
+              onClick={() => {
+                uiClick('tap')
+                closeMenu()
+              }}
             >
               <CartIcon />
               {itemCount > 0 && <span className="icon-badge">{itemCount}</span>}
@@ -128,7 +148,10 @@ export default function Header() {
               to={user ? '/account' : '/login'}
               className={iconLinkClass}
               aria-label={user ? 'Your account' : 'Sign in'}
-              onClick={closeMenu}
+              onClick={() => {
+                uiClick('tap')
+                closeMenu()
+              }}
             >
               <LoginIcon />
             </NavLink>
