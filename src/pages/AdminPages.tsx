@@ -63,7 +63,10 @@ export default function AdminPages() {
     setMessage(null)
 
     try {
-      await saveSiteSettings(form)
+      await saveSiteSettings({
+        ...form,
+        pages: { ...form.pages, about: false },
+      })
       setMessage('Page settings saved.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save page settings')
@@ -96,21 +99,28 @@ export default function AdminPages() {
             </div>
 
             <ul className="admin-page-toggle-list">
-              {SITE_NAV_PAGES.map((page) => (
-                <li key={page.id}>
-                  <label className="admin-toggle admin-page-toggle">
-                    <input
-                      type="checkbox"
-                      checked={form.pages[page.id]}
-                      onChange={(event) => togglePage(page.id, event.target.checked)}
-                    />
-                    <span>
-                      <strong>{page.label}</strong>
-                      <small>{page.to}</small>
-                    </span>
-                  </label>
-                </li>
-              ))}
+              {SITE_NAV_PAGES.map((page) => {
+                const temporarilyHidden = page.id === 'about'
+                return (
+                  <li key={page.id}>
+                    <label className="admin-toggle admin-page-toggle">
+                      <input
+                        type="checkbox"
+                        checked={temporarilyHidden ? false : form.pages[page.id]}
+                        disabled={temporarilyHidden}
+                        onChange={(event) => togglePage(page.id, event.target.checked)}
+                      />
+                      <span>
+                        <strong>{page.label}</strong>
+                        <small>
+                          {page.to}
+                          {temporarilyHidden ? ' · temporarily hidden' : ''}
+                        </small>
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
             </ul>
           </div>
 

@@ -59,7 +59,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   pages: {
     home: true,
     store: true,
-    about: true,
+    // Temporarily hidden — About.tsx and /about route remain; flip to true when ready.
+    about: false,
     contact: true,
   },
   siteOffline: false,
@@ -120,7 +121,8 @@ export function parseSiteSettings(data: Record<string, unknown> | undefined): Si
     pages: {
       home: pagesInput.home !== false,
       store: pagesInput.store !== false,
-      about: pagesInput.about !== false,
+      // Temporarily force-hidden; keep About.tsx + route. Re-enable with: pagesInput.about !== false
+      about: false,
       contact: pagesInput.contact !== false,
     },
     siteOffline: data?.siteOffline === true,

@@ -29,6 +29,25 @@ export default function Store() {
     [productTypes],
   )
 
+  const categoriesWithProducts = useMemo(() => {
+    const used = new Set(
+      products.map((product) => product.category?.trim()).filter((id): id is string => Boolean(id)),
+    )
+    return storeCategories.filter((category) => used.has(category.id))
+  }, [storeCategories, products])
+
+  const typesWithProducts = useMemo(() => {
+    const used = new Set(
+      products
+        .map((product) => product.productTypeId?.trim())
+        .filter((id): id is string => Boolean(id)),
+    )
+    return activeProductTypes.filter((type) => used.has(type.id))
+  }, [activeProductTypes, products])
+
+  const showCategoryFilters = categoriesWithProducts.length > 0
+  const showTypeFilters = typesWithProducts.length > 0
+
   const filteredProducts = products.filter((product) => {
     if (activeCategory !== 'all' && product.category !== activeCategory) return false
     if (activeType !== 'all' && product.productTypeId !== activeType) return false
@@ -73,51 +92,60 @@ export default function Store() {
       <PageHeader title="Shop" subtitle={subtitle} />
 
       <section className="store-browse" aria-label="Shop catalog">
-        <nav className="store-nav" aria-label="Shop filters">
-          <div className="store-nav-row">
-            <button
-              type="button"
-              className={`store-nav-link ${activeCategory === 'all' ? 'is-active' : ''}`}
-              onClick={() => updateFilters({ category: 'all' })}
-            >
-              All
-            </button>
-            {storeCategories.map((category) => (
-              <button
-                key={category.id}
-                type="button"
-                className={`store-nav-link ${activeCategory === category.id ? 'is-active' : ''}`}
-                onClick={() => updateFilters({ category: category.id })}
-              >
-                {category.name}
-              </button>
-            ))}
-            {hasActiveFilters && (
-              <button type="button" className="store-nav-clear" onClick={clearFilters}>
-                Clear
-              </button>
-            )}
-          </div>
-
-          {activeProductTypes.length > 0 && (
-            <div className="store-nav-row store-nav-row-secondary" aria-label="Collections">
-              {activeProductTypes.map((type) => (
+        {(showCategoryFilters || showTypeFilters) && (
+          <nav className="store-nav" aria-label="Shop filters">
+            {showCategoryFilters && (
+              <div className="store-nav-row">
                 <button
-                  key={type.id}
                   type="button"
-                  className={`store-nav-link is-quiet ${activeType === type.id ? 'is-active' : ''}`}
-                  onClick={() =>
-                    updateFilters({
-                      type: activeType === type.id ? 'all' : type.id,
-                    })
-                  }
+                  className={`store-nav-link ${activeCategory === 'all' ? 'is-active' : ''}`}
+                  onClick={() => updateFilters({ category: 'all' })}
                 >
-                  {type.name}
+                  All
                 </button>
-              ))}
-            </div>
-          )}
-        </nav>
+                {categoriesWithProducts.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={`store-nav-link ${activeCategory === category.id ? 'is-active' : ''}`}
+                    onClick={() => updateFilters({ category: category.id })}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+                {hasActiveFilters && (
+                  <button type="button" className="store-nav-clear" onClick={clearFilters}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+
+            {showTypeFilters && (
+              <div className="store-nav-row store-nav-row-secondary" aria-label="Collections">
+                {typesWithProducts.map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    className={`store-nav-link is-quiet ${activeType === type.id ? 'is-active' : ''}`}
+                    onClick={() =>
+                      updateFilters({
+                        type: activeType === type.id ? 'all' : type.id,
+                      })
+                    }
+                  >
+                    {type.name}
+                  </button>
+                ))}
+                {!showCategoryFilters && hasActiveFilters && (
+                  <button type="button" className="store-nav-clear" onClick={clearFilters}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+          </nav>
+        )}
 
         {loading && <p className="store-status">Loading products...</p>}
         {error && <p className="form-error">{error}</p>}

@@ -184,11 +184,6 @@ export default function Admin() {
     loadProducts()
   }, [])
 
-  useEffect(() => {
-    if (form.id || categories.length === 0 || form.category) return
-    setForm((prev) => ({ ...prev, category: categories[0].id }))
-  }, [categories, form.id, form.category])
-
   async function selectProduct(product: AdminProduct) {
     setTab('details')
     setMessage(null)
@@ -227,7 +222,16 @@ export default function Admin() {
     if (!productType) return { ...current, productTypeId }
 
     const shippingType = shippingTypes.find((type) => type.id === productType.shippingTypeId)
-    const shipClass = shippingType?.shipClass ?? current.shipClass
+    // Prefer shipping-type shipClass; fall back to letter-eligible flag / known letter id.
+    const shipClass: ProductForm['shipClass'] =
+      productType.shipsAsLetter || productType.shippingTypeId === 'letter'
+        ? 'letter'
+        : shippingType?.shipClass === 'letter' ||
+            shippingType?.shipClass === 'soft_pack' ||
+            shippingType?.shipClass === 'parcel'
+          ? shippingType.shipClass
+          : 'soft_pack'
+
     return {
       ...current,
       productTypeId,
@@ -238,7 +242,9 @@ export default function Admin() {
       shipClass,
       weightOz: shipClass === 'letter' ? '0.1' : shipClass === 'parcel' ? '4' : '1',
       thicknessIn: shipClass === 'letter' ? '0.02' : shipClass === 'parcel' ? '2' : '0.5',
-      maxLetterQty: String(productType.maxLetterQty),
+      maxLetterQty: String(
+        shipClass === 'letter' ? productType.maxLetterQty || 10 : productType.maxLetterQty || 0,
+      ),
     }
   }
 
@@ -254,12 +260,13 @@ export default function Admin() {
     const nextId = createProductId()
     draftProductIdRef.current = nextId
     setProductMode('edit')
-    setForm({
+    const base: ProductForm = {
       ...emptyForm(),
       id: nextId,
-      category: categories[0]?.id ?? '',
-      productTypeId: productTypes[0]?.id ?? '',
-    })
+      category: '',
+    }
+    const defaultTypeId = productTypes[0]?.id ?? ''
+    setForm(defaultTypeId ? applyProductTypeDefaults(defaultTypeId, base) : base)
     setTab('details')
     setMessage(null)
     setError(null)
@@ -273,8 +280,8 @@ export default function Admin() {
 
     const priceInCents = dollarsToCents(form.price)
 
-    if (!form.category.trim() && categories.length > 0) {
-      setError('Choose a category before saving.')
+    if (!form.name.trim()) {
+      setError('Enter a product name before saving.')
       setSaving(false)
       return
     }
@@ -496,7 +503,8 @@ export default function Admin() {
     setError(null)
     setMessage(null)
     try {
-      const result = await batchUpdateAdminProducts(selectedIds, { category: batchCategoryId })
+      const category = batchCategoryId === '__none__' ? '' : batchCategoryId
+      const result = await batchUpdateAdminProducts(selectedIds, { category })
       setMessage(`Updated category on ${result.updated} product${result.updated === 1 ? '' : 's'}.`)
       setSelectedIds([])
       setBatchCategoryId('')
@@ -571,7 +579,8 @@ export default function Admin() {
   }
 
   function isCategoryMissing(categoryId: string): boolean {
-    return !categoryId || !categories.some((category) => category.id === categoryId)
+    // Empty is intentional ("No category"); only warn when an id no longer exists.
+    return Boolean(categoryId) && !categories.some((category) => category.id === categoryId)
   }
 
   return (
@@ -762,6 +771,7 @@ export default function Admin() {
                     Category
                     <select value={batchCategoryId} onChange={(e) => setBatchCategoryId(e.target.value)}>
                       <option value="">Choose…</option>
+                      <option value="__none__">No category</option>
                       {categories.map((category) => (
                         <option key={category.id} value={category.id}>
                           {category.name}
@@ -970,14 +980,14 @@ export default function Admin() {
                   <select
                     value={form.category}
                     onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-                    required={categories.length > 0}
                   >
-                    {categories.length === 0 && <option value="">No categories yet</option>}
-                    {categories.length > 0 && !categories.some((category) => category.id === form.category) && (
-                      <option value={form.category || ''}>
-                        {form.category ? 'Uncategorized (pick a category)' : 'Select a category'}
-                      </option>
-                    )}
+                    <option value="">No category</option>
+                    {form.category &&
+                      !categories.some((category) => category.id === form.category) && (
+                        <option value={form.category}>
+                          Unknown category ({form.category})
+                        </option>
+                      )}
                     {categories.map((category) => (
                       <option key={category.id} value={category.id}>
                         {category.name}

@@ -485,13 +485,19 @@ export async function batchUpdateAdminProducts(
       if (patch.applyProductTypeDefaults && productType) {
         updates.productTypeId = productType.id
         updates.maxLetterQty = productType.maxLetterQty
-        if (shippingType) {
-          updates.shipClass = shippingType.shipClass
-          updates.weightOz =
-            shippingType.shipClass === 'letter' ? 0.1 : shippingType.shipClass === 'parcel' ? 4 : 1
-          updates.thicknessIn =
-            shippingType.shipClass === 'letter' ? 0.02 : shippingType.shipClass === 'parcel' ? 2 : 0.5
-        }
+        const shipClass =
+          productType.shipsAsLetter || productType.shippingTypeId === 'letter'
+            ? 'letter'
+            : shippingType?.shipClass === 'letter' ||
+                shippingType?.shipClass === 'soft_pack' ||
+                shippingType?.shipClass === 'parcel'
+              ? shippingType.shipClass
+              : 'soft_pack'
+        updates.shipClass = shipClass
+        updates.weightOz = shipClass === 'letter' ? 0.1 : shipClass === 'parcel' ? 4 : 1
+        updates.thicknessIn = shipClass === 'letter' ? 0.02 : shipClass === 'parcel' ? 2 : 0.5
+        updates.maxLetterQty =
+          shipClass === 'letter' ? productType.maxLetterQty || 10 : productType.maxLetterQty || 0
       }
 
       await setDoc(doc(db, 'products', productId), updates, { merge: true })
