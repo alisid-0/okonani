@@ -220,7 +220,7 @@ body {
 }
 
 .home-section {
-  padding: 2rem 0 2.25rem;
+  padding: 1.5rem 0 1.65rem;
   border-bottom: none;
 }
 
@@ -269,7 +269,7 @@ body {
   display: flex;
   justify-content: center;
   padding-top: 1.85rem;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0;
 }
 
 .home-notebook-hero .hero-image {
@@ -284,7 +284,7 @@ body {
 }
 
 .home-notebook .hero-large + .home-notebook-sheet {
-  padding-top: 1.5rem;
+  padding-top: 0.35rem;
 }
 
 /* Hero — scallop backdrop on non-notebook pages only */
@@ -619,26 +619,35 @@ body {
   }
 
   .home-notebook-hero {
-    padding-top: 1.5rem;
-    padding-bottom: 0.15rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0;
   }
 
   .home-notebook-sheet.home-notebook-hero {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
   .home-notebook-hero .hero-image {
-    width: min(96vw, 100%);
-    max-height: min(73vh, 40rem);
+    width: 100%;
+    max-width: 100%;
+    max-height: min(72vh, 34rem);
+    min-height: 0;
+    height: auto;
+    object-fit: contain;
+    object-position: center top;
+  }
+
+  .home-notebook .hero-large + .home-notebook-sheet {
+    padding-top: 0.15rem;
   }
 
   .home-notebook-sheet {
-    padding: 0.35rem 0.75rem 0 0.75rem;
+    padding: 0.25rem 1.35rem 0 1.35rem;
   }
 
   .home-section {
-    padding: 1.5rem 0 1.75rem;
+    padding: 1.1rem 0 1.25rem;
   }
 
   .header-inner::before,

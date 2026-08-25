@@ -96,6 +96,77 @@ async function loadShippingCatalog() {
   return { shippingTypes, productTypes }
 }
 
+function productCoverUrl(product) {
+  if (!product || !Array.isArray(product.media)) return null
+  const image = product.media.find(
+    (item) =>
+      item &&
+      (item.type === 'image' || !item.type) &&
+      typeof item.url === 'string' &&
+      item.url.trim(),
+  )
+  return image ? String(image.url).trim() : null
+}
+
+function resolveProductOptionGroups(product, productTypes) {
+  if (!product) return []
+  const mode = product.optionsMode === 'custom' || product.optionsMode === 'none' || product.optionsMode === 'inherit'
+    ? product.optionsMode
+    : 'inherit'
+
+  if (mode === 'none') return []
+  if (mode === 'custom' && Array.isArray(product.optionGroups)) return product.optionGroups
+
+  const typeId = typeof product.productTypeId === 'string' ? product.productTypeId : ''
+  const productType = productTypes.find((type) => type.id === typeId)
+  if (productType && Array.isArray(productType.optionGroups)) return productType.optionGroups
+  return Array.isArray(product.optionGroups) ? product.optionGroups : []
+}
+
+function enrichSelectedOptions(selectedOptions, product, productTypes) {
+  if (!Array.isArray(selectedOptions) || selectedOptions.length === 0) return []
+  const groups = resolveProductOptionGroups(product, productTypes)
+
+  return selectedOptions
+    .map((option) => {
+      if (!option || typeof option !== 'object') return null
+      const groupName = String(option.groupName || '').trim()
+      const choiceLabel = String(option.choiceLabel || '').trim()
+      const groupId = String(option.groupId || '').trim()
+      const choiceId = String(option.choiceId || '').trim()
+      if (!groupName || !choiceLabel) return null
+
+      const group =
+        groups.find((item) => item && (item.id === groupId || item.name === groupName)) || null
+      const choice =
+        group && Array.isArray(group.choices)
+          ? group.choices.find(
+              (item) =>
+                item &&
+                (item.id === choiceId ||
+                  String(item.label || '').trim() === choiceLabel),
+            )
+          : null
+
+      const imageUrl =
+        (typeof option.imageUrl === 'string' && option.imageUrl.trim()) ||
+        (typeof choice?.imageUrl === 'string' && choice.imageUrl.trim()) ||
+        ''
+
+      const priceDeltaCents = Math.round(Number(option.priceDeltaCents) || 0)
+
+      return {
+        groupName,
+        choiceLabel,
+        priceDeltaCents,
+        ...(groupId ? { groupId } : {}),
+        ...(choiceId ? { choiceId } : {}),
+        ...(imageUrl ? { imageUrl } : {}),
+      }
+    })
+    .filter(Boolean)
+}
+
 async function persistCheckoutOrder(stripe, session) {
   if (session.payment_status !== 'paid') {
     return { saved: false, reason: 'not_paid' }
@@ -162,6 +233,13 @@ async function persistCheckoutOrder(stripe, session) {
       }
     }
 
+    const enrichedOptions = enrichSelectedOptions(
+      selectedOptions,
+      product,
+      catalog.productTypes,
+    )
+    const imageUrl = productCoverUrl(product)
+
     return {
       productId: product?.id || meta.productId || null,
       name: item.description || product?.name || 'Item',
@@ -170,7 +248,8 @@ async function persistCheckoutOrder(stripe, session) {
         typeof price?.unit_amount === 'number' ? price.unit_amount : product?.priceInCents || 0,
       amountCents: typeof item.amount_total === 'number' ? item.amount_total : 0,
       stripePriceId: catalogPriceId || priceId || null,
-      selectedOptions,
+      imageUrl: imageUrl || null,
+      selectedOptions: enrichedOptions,
       productTypeId: typeof product?.productTypeId === 'string' ? product.productTypeId : '',
       shipClass: normalizeShipClass(product?.shipClass),
       weightOz: typeof product?.weightOz === 'number' ? product.weightOz : null,

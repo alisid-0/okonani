@@ -701,26 +701,36 @@
 
 @media (max-width: 768px) {
   .product-detail-shell {
-    padding: 1.35rem 1.15rem 1.5rem;
+    padding: 1.15rem 1.15rem 1.35rem;
   }
 
   .product-detail-layout {
     grid-template-columns: 1fr;
-    gap: 1.75rem;
-    margin-bottom: 1.75rem;
-    padding-bottom: 1.75rem;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
   }
 
   .product-detail-gallery-wrap {
-    padding: 0.5rem;
+    padding: 0.35rem;
   }
 
   .product-detail-panel {
     padding: 0;
   }
 
+  .product-detail-panel .btn-primary {
+    width: 100%;
+  }
+
   .product-reviews {
-    padding: 1.35rem 1.15rem 1.25rem;
+    padding: 1.25rem 1.15rem 1.15rem;
+  }
+
+  .product-reviews-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.65rem;
   }
 }
 
@@ -858,25 +868,25 @@
 @media (max-width: 768px) {
   .main-notebook,
   .main-scrapbook {
-    padding: 1.25rem 0.75rem 3rem;
+    padding: 1.25rem 1.25rem 3rem;
   }
 
   .notebook-page,
   .scrapbook-page {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
 
   .notebook-page .store-body,
   .scrapbook-page .store-body {
-    padding: 1rem 0.5rem 1.5rem;
+    padding: 1rem 0.35rem 1.5rem;
   }
 
   .notebook-page .page-sheet,
   .notebook-page.page-contact .page-sheet,
   .scrapbook-page .page-sheet,
   .scrapbook-page.page-contact .page-sheet {
-    padding: 1.25rem 1rem 1.15rem;
+    padding: 1.25rem 1.15rem 1.15rem;
   }
 
   .page-about .about-card,

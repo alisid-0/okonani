@@ -9,6 +9,7 @@ type CheckoutItem = {
     choiceId: string
     choiceLabel: string
     priceDeltaCents: number
+    imageUrl?: string
   }>
 }
 

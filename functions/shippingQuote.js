@@ -156,6 +156,7 @@ function parseProductType(id, data = {}) {
     shippingTypeId,
     shipsAsLetter,
     maxLetterQty: Math.max(0, Math.round(Number(data.maxLetterQty) || 0)),
+    optionGroups: Array.isArray(data.optionGroups) ? data.optionGroups : [],
     sortOrder: typeof data.sortOrder === 'number' ? data.sortOrder : 0,
     active: data.active !== false,
   }

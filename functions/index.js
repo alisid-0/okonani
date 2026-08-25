@@ -653,6 +653,16 @@ exports.createCheckoutSession = onRequest(
           ? `${productName || 'Item'} (${optionsLabel})`
           : productName || 'Item'
 
+        // Compact option snapshot for Stripe metadata (500-char cap). Full images
+        // are resolved from the catalog when the order is persisted.
+        const compactOptions = selectedOptions.map((option) => ({
+          groupId: String(option?.groupId || '').slice(0, 64),
+          groupName: String(option?.groupName || '').slice(0, 80),
+          choiceId: String(option?.choiceId || '').slice(0, 64),
+          choiceLabel: String(option?.choiceLabel || '').slice(0, 80),
+          priceDeltaCents: Math.round(Number(option?.priceDeltaCents) || 0),
+        }))
+
         prepared.push({
           stripeLine: {
             price_data: {
@@ -664,7 +674,7 @@ exports.createCheckoutSession = onRequest(
                 metadata: {
                   productId: productId.slice(0, 500),
                   stripePriceId,
-                  selectedOptions: JSON.stringify(selectedOptions).slice(0, 500),
+                  selectedOptions: JSON.stringify(compactOptions).slice(0, 500),
                 },
               },
             },

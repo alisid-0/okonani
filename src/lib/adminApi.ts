@@ -797,6 +797,7 @@ export type AdminOrderItem = {
   quantity: number
   unitAmountCents: number
   amountCents: number
+  imageUrl: string | null
   productTypeId: string
   shipClass: 'letter' | 'soft_pack' | 'parcel'
   weightOz: number | null
@@ -806,6 +807,9 @@ export type AdminOrderItem = {
     groupName: string
     choiceLabel: string
     priceDeltaCents?: number
+    groupId?: string
+    choiceId?: string
+    imageUrl?: string
   }>
 }
 
@@ -869,9 +873,23 @@ function parseOrderAddress(data: unknown): AdminOrderAddress | null {
 
 function parseOrderSelectedOptions(
   value: unknown,
-): Array<{ groupName: string; choiceLabel: string; priceDeltaCents?: number }> {
+): Array<{
+  groupName: string
+  choiceLabel: string
+  priceDeltaCents?: number
+  groupId?: string
+  choiceId?: string
+  imageUrl?: string
+}> {
   if (!Array.isArray(value)) return []
-  const options: Array<{ groupName: string; choiceLabel: string; priceDeltaCents?: number }> = []
+  const options: Array<{
+    groupName: string
+    choiceLabel: string
+    priceDeltaCents?: number
+    groupId?: string
+    choiceId?: string
+    imageUrl?: string
+  }> = []
   for (const option of value) {
     if (!option || typeof option !== 'object') continue
     const opt = option as Record<string, unknown>
@@ -880,6 +898,11 @@ function parseOrderSelectedOptions(
       groupName: opt.groupName,
       choiceLabel: opt.choiceLabel,
       ...(typeof opt.priceDeltaCents === 'number' ? { priceDeltaCents: opt.priceDeltaCents } : {}),
+      ...(typeof opt.groupId === 'string' && opt.groupId ? { groupId: opt.groupId } : {}),
+      ...(typeof opt.choiceId === 'string' && opt.choiceId ? { choiceId: opt.choiceId } : {}),
+      ...(typeof opt.imageUrl === 'string' && opt.imageUrl.trim()
+        ? { imageUrl: opt.imageUrl.trim() }
+        : {}),
     })
   }
   return options
@@ -897,6 +920,8 @@ function parseAdminOrder(id: string, data: Record<string, unknown>): AdminOrder 
         quantity: typeof record.quantity === 'number' ? record.quantity : 1,
         unitAmountCents: typeof record.unitAmountCents === 'number' ? record.unitAmountCents : 0,
         amountCents: typeof record.amountCents === 'number' ? record.amountCents : 0,
+        imageUrl:
+          typeof record.imageUrl === 'string' && record.imageUrl.trim() ? record.imageUrl.trim() : null,
         productTypeId: typeof record.productTypeId === 'string' ? record.productTypeId : '',
         shipClass:
           record.shipClass === 'letter' || record.shipClass === 'parcel' ? record.shipClass : 'soft_pack',

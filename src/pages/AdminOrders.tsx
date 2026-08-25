@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { formatPrice } from '../data/products'
+import { getProductCover, formatPrice } from '../data/products'
+import { resolveProductOptionGroups } from '../data/productOptions'
 import {
   getAdminOrderRates,
   listAdminOrders,
+  listAdminProducts,
+  listAdminProductTypes,
   markOrderFulfilledWithStamp,
   purchaseAdminOrderLabel,
   resetOrderFulfillment,
   type AdminOrder,
+  type AdminOrderItem,
+  type AdminProduct,
 } from '../lib/adminApi'
+import type { ProductType } from '../data/productTypes'
 import { packageTypeLabel, type PackageType } from '../lib/packaging'
 import { playUiSound, uiClick } from '../lib/uiSounds'
 
@@ -52,6 +58,67 @@ function packageTypeFromOrder(order: AdminOrder): PackageType {
   return 'bubble_mailer'
 }
 
+type DisplayOrderOption = {
+  groupName: string
+  choiceLabel: string
+  imageUrl?: string
+}
+
+type DisplayOrderItem = {
+  quantity: number
+  name: string
+  amountCents: number
+  coverUrl: string | null
+  options: DisplayOrderOption[]
+}
+
+function resolveDisplayItem(
+  item: AdminOrderItem,
+  productsById: Map<string, AdminProduct>,
+  productTypes: ProductType[],
+): DisplayOrderItem {
+  const product = item.productId ? productsById.get(item.productId) : undefined
+  const coverUrl = item.imageUrl || (product ? getProductCover(product) : null)
+  const groups = product
+    ? resolveProductOptionGroups(product, productTypes.find((type) => type.id === product.productTypeId))
+    : []
+
+  const options = item.selectedOptions.map((option) => {
+    if (option.imageUrl) {
+      return {
+        groupName: option.groupName,
+        choiceLabel: option.choiceLabel,
+        imageUrl: option.imageUrl,
+      }
+    }
+
+    const group =
+      groups.find(
+        (entry) =>
+          entry.id === option.groupId || entry.name === option.groupName,
+      ) ?? null
+    const choice =
+      group?.choices.find(
+        (entry) =>
+          entry.id === option.choiceId || entry.label === option.choiceLabel,
+      ) ?? null
+
+    return {
+      groupName: option.groupName,
+      choiceLabel: option.choiceLabel,
+      ...(choice?.imageUrl ? { imageUrl: choice.imageUrl } : {}),
+    }
+  })
+
+  return {
+    quantity: item.quantity,
+    name: item.name,
+    amountCents: item.amountCents || item.unitAmountCents * item.quantity,
+    coverUrl,
+    options,
+  }
+}
+
 export default function AdminOrders({ initialOrderId = null }: { initialOrderId?: string | null }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<AdminOrder[]>([])
@@ -74,6 +141,8 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
     }>
   >([])
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null)
+  const [catalogProducts, setCatalogProducts] = useState<AdminProduct[]>([])
+  const [catalogProductTypes, setCatalogProductTypes] = useState<ProductType[]>([])
 
   function selectOrder(orderId: string) {
     uiClick('tap')
@@ -85,6 +154,18 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
   }
 
   const selected = orders.find((order) => order.id === selectedId) ?? null
+  const productsById = useMemo(() => {
+    const map = new Map<string, AdminProduct>()
+    for (const product of catalogProducts) map.set(product.id, product)
+    return map
+  }, [catalogProducts])
+  const displayItems = useMemo(
+    () =>
+      selected
+        ? selected.items.map((item) => resolveDisplayItem(item, productsById, catalogProductTypes))
+        : [],
+    [selected, productsById, catalogProductTypes],
+  )
   const visibleOrders =
     filter === 'unfulfilled' ?
       orders.filter((order) => order.fulfillmentStatus === 'unfulfilled')
@@ -98,8 +179,16 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
     setError(null)
 
     try {
-      const next = await listAdminOrders()
+      const [next, catalog] = await Promise.all([
+        listAdminOrders(),
+        Promise.all([listAdminProducts(), listAdminProductTypes()]).then(([products, types]) => ({
+          products: products.products,
+          types,
+        })),
+      ])
       setOrders(next)
+      setCatalogProducts(catalog.products)
+      setCatalogProductTypes(catalog.types)
       const preferred = selectId || initialOrderId
       const nextSelected =
         preferred && next.some((order) => order.id === preferred) ?
@@ -419,19 +508,41 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                 <div>
                   <h3>Items</h3>
                   <ul className="admin-orders-items">
-                    {selected.items.map((item, index) => (
-                      <li key={`${item.productId || item.name}-${index}`}>
-                        <div>
-                          {item.quantity} × {item.name}{' '}
-                          <span>
-                            {formatPrice(item.amountCents || item.unitAmountCents * item.quantity)}
-                          </span>
-                          {item.selectedOptions.length > 0 && (
-                            <p className="admin-orders-item-options">
-                              {item.selectedOptions
-                                .map((option) => `${option.groupName}: ${option.choiceLabel}`)
-                                .join(' · ')}
-                            </p>
+                    {displayItems.map((item, index) => (
+                      <li key={`${item.name}-${index}`} className="admin-orders-line">
+                        <div className="admin-orders-line-media">
+                          {item.coverUrl ?
+                            <img
+                              src={item.coverUrl}
+                              alt=""
+                              className="admin-orders-line-cover"
+                            />
+                          : <div className="admin-orders-line-cover is-placeholder" aria-hidden />}
+                          {item.options
+                            .filter((option) => option.imageUrl)
+                            .map((option) => (
+                              <img
+                                key={`${option.groupName}-${option.choiceLabel}`}
+                                src={option.imageUrl}
+                                alt=""
+                                className="admin-orders-line-option-thumb"
+                                title={`${option.groupName}: ${option.choiceLabel}`}
+                              />
+                            ))}
+                        </div>
+                        <div className="admin-orders-line-copy">
+                          <p className="admin-orders-line-title">
+                            {item.quantity} × {item.name}{' '}
+                            <span>{formatPrice(item.amountCents)}</span>
+                          </p>
+                          {item.options.length > 0 && (
+                            <ul className="admin-orders-item-options">
+                              {item.options.map((option) => (
+                                <li key={`${option.groupName}-${option.choiceLabel}`}>
+                                  {option.groupName}: {option.choiceLabel}
+                                </li>
+                              ))}
+                            </ul>
                           )}
                         </div>
                       </li>
