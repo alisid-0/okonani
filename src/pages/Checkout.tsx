@@ -20,6 +20,7 @@ export default function Checkout() {
   const location = useLocation()
   const state = (location.state || {}) as CheckoutLocationState
   const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState('')
 
   const items = useMemo(
     () =>
@@ -43,7 +44,9 @@ export default function Checkout() {
         authToken,
         promotionCode: state.promotionCode,
         rewardId: state.rewardId,
+        returnOrigin: window.location.origin,
       })
+      if (session.sessionId) setSessionId(session.sessionId)
       return session.clientSecret
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not start checkout'
@@ -77,9 +80,20 @@ export default function Checkout() {
       onShippingDetailsChange,
       onComplete: () => {
         clearCart()
+        // Prefer apex success URL — www.okonani.com TLS is broken and Safari fails there.
+        const id = sessionId
+        const successPath = id
+          ? `/checkout/success?session_id=${encodeURIComponent(id)}`
+          : '/checkout/success'
+        const host = window.location.hostname.toLowerCase()
+        if (host === 'www.okonani.com') {
+          window.location.replace(`https://okonani.com${successPath}`)
+          return
+        }
+        window.location.replace(`${window.location.origin}${successPath}`)
       },
     }),
-    [fetchClientSecret, onShippingDetailsChange, clearCart],
+    [fetchClientSecret, onShippingDetailsChange, clearCart, sessionId],
   )
 
   if (lines.length === 0) {

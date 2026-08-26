@@ -17,6 +17,7 @@ type CheckoutOptions = {
   rewardId?: string
   promotionCode?: string
   authToken?: string | null
+  returnOrigin?: string
 }
 
 export type CreateCheckoutSessionResult = {
@@ -64,6 +65,13 @@ export async function createCheckoutSession(
 
   if (options.promotionCode?.trim()) {
     body.promotionCode = options.promotionCode.trim()
+  }
+
+  const returnOrigin =
+    options.returnOrigin?.trim() ||
+    (typeof window !== 'undefined' ? window.location.origin : '')
+  if (returnOrigin) {
+    body.returnOrigin = returnOrigin
   }
 
   const res = await fetch(apiUrl('/api/create-checkout-session'), {

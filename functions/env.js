@@ -56,6 +56,71 @@ function getClientUrl(fallback) {
   return getConfig('CLIENT_URL') || fallback || 'http://localhost:5173'
 }
 
+/**
+ * Canonical public site URL for Stripe return_url.
+ * Prefer the shopper's origin, then CLIENT_URL — never localhost in production,
+ * and map www.okonani.com → okonani.com (www currently has a broken TLS cert).
+ */
+function resolveCheckoutClientUrl(req) {
+  const bodyOrigin =
+    req?.body && typeof req.body.returnOrigin === 'string' ? req.body.returnOrigin.trim() : ''
+  const headerOrigin = String(req?.get?.('origin') || '').trim()
+  const configured = getClientUrl('').trim()
+
+  const candidates = [bodyOrigin, headerOrigin, configured, 'https://okonani.com']
+
+  for (const candidate of candidates) {
+    const normalized = normalizePublicSiteUrl(candidate)
+    if (normalized) return normalized
+  }
+
+  return 'https://okonani.com'
+}
+
+function normalizePublicSiteUrl(value) {
+  if (!value || typeof value !== 'string') return null
+  let raw = value.trim().replace(/\/$/, '')
+  if (!raw) return null
+
+  try {
+    if (!/^https?:\/\//i.test(raw)) raw = `https://${raw}`
+    const url = new URL(raw)
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
+
+    const host = url.hostname.toLowerCase()
+    if (host === 'localhost' || host === '127.0.0.1') {
+      // Allow only for local development when CLIENT_URL is also local.
+      const configured = getClientUrl('').toLowerCase()
+      if (configured.includes('localhost') || configured.includes('127.0.0.1')) {
+        return `${url.protocol}//${url.host}`
+      }
+      return null
+    }
+
+    // www.okonani.com cert is broken — always send shoppers to apex.
+    if (host === 'www.okonani.com') {
+      return 'https://okonani.com'
+    }
+
+    if (host === 'okonani.com') {
+      return 'https://okonani.com'
+    }
+
+    if (host.endsWith('.web.app') || host.endsWith('.firebaseapp.com')) {
+      return `https://${host}`
+    }
+
+    // Other https origins (staging, etc.)
+    if (url.protocol === 'https:') {
+      return `https://${url.host}`
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 function safeSecretValue(secret) {
   try {
     return secret.value()
@@ -146,6 +211,7 @@ module.exports = {
   getShippoToken,
   getShipFromAddress,
   getClientUrl,
+  resolveCheckoutClientUrl,
   getProjectId,
   getStorageBucketName,
 }

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { formatPrice } from '../data/products'
+import { Price } from '../lib/readableNumbers'
 import type { ShippingType } from '../data/shippingTypes'
 import {
   installDefaultShippingTypes,
@@ -12,6 +13,7 @@ type LetterForm = {
   id: string
   flatFee: string
   maxItems: string
+  freeShippingMin: string
   active: boolean
 }
 
@@ -19,6 +21,7 @@ const emptyForm = (): LetterForm => ({
   id: 'letter',
   flatFee: '1.50',
   maxItems: '10',
+  freeShippingMin: '50',
   active: true,
 })
 
@@ -41,6 +44,10 @@ function toForm(type: ShippingType): LetterForm {
     id: type.id,
     flatFee: (type.baseRateCents / 100).toFixed(2),
     maxItems: String(type.maxItems > 0 ? type.maxItems : 10),
+    freeShippingMin:
+      type.freeAboveSubtotalCents && type.freeAboveSubtotalCents > 0
+        ? (type.freeAboveSubtotalCents / 100).toFixed(0)
+        : '50',
     active: type.active,
   }
 }
@@ -107,7 +114,7 @@ export default function AdminShippingTypes() {
         postageMode: 'stamp',
         shipClass: 'letter',
         baseRateCents: dollarsToCents(form.flatFee),
-        freeAboveSubtotalCents: null,
+        freeAboveSubtotalCents: dollarsToCents(form.freeShippingMin),
         includedWeightOz: 3,
         overweightCentsPerOz: 0,
         maxWeightOz: 3,
@@ -172,6 +179,16 @@ export default function AdminShippingTypes() {
             />
           </label>
           <label>
+            Free shipping over ($)
+            <input
+              value={form.freeShippingMin}
+              onChange={(e) => setForm((prev) => ({ ...prev, freeShippingMin: e.target.value }))}
+              inputMode="decimal"
+              min={0}
+              required
+            />
+          </label>
+          <label>
             Max letter items
             <input
               value={form.maxItems}
@@ -205,7 +222,20 @@ export default function AdminShippingTypes() {
                   <strong>Untracked letter</strong>
                   <span>
                     Flat fee · ≤ {form.maxItems || '10'} items ·{' '}
-                    {letter ? formatPrice(letter.baseRateCents) : 'not set'}
+                    {letter ? <Price cents={letter.baseRateCents} /> : 'not set'}
+                  </span>
+                </span>
+              </div>
+            </li>
+            <li>
+              <div className="admin-sidebar-item">
+                <span className="admin-sidebar-copy">
+                  <strong>Free shipping</strong>
+                  <span>
+                    Orders over{' '}
+                    {letter?.freeAboveSubtotalCents
+                      ? <Price cents={letter.freeAboveSubtotalCents} />
+                      : '$50'}
                   </span>
                 </span>
               </div>

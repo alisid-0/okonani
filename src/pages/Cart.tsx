@@ -8,6 +8,12 @@ import { useCart } from '../context/CartContext'
 import { useShopPause } from '../context/ShopPauseContext'
 import { formatPrice, getProductCover, maxOrderQuantity } from '../data/products'
 import { formatSelectedOptions, unitPriceWithOptions } from '../data/productOptions'
+import {
+  amountUntilFreeShipping,
+  qualifiesForFreeShipping,
+} from '../lib/freeShipping'
+import { Price, ReadableNumbers } from '../lib/readableNumbers'
+import { useFreeShippingThresholdCents } from '../lib/useFreeShippingThreshold'
 import ProtectedImage from '../components/ProtectedImage'
 import { getRewardsSummary, type RewardsSummary } from '../lib/rewardsApi'
 import { uiClick } from '../lib/uiSounds'
@@ -15,6 +21,7 @@ import { uiClick } from '../lib/uiSounds'
 export default function Cart() {
   const { user } = useAuth()
   const { lines, subtotalCents, updateQuantity, removeItem, quantityForProduct } = useCart()
+  const freeShippingThresholdCents = useFreeShippingThresholdCents()
   const { shoppingPaused, showPausedModal } = useShopPause()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -107,6 +114,8 @@ export default function Cart() {
   const selectedReward = rewards?.activeRewards.find((reward) => reward.id === selectedRewardId)
   const potentialPoints = Math.floor(subtotalCents / 100)
   const itemCount = lines.reduce((total, line) => total + line.quantity, 0)
+  const freeShipping = qualifiesForFreeShipping(subtotalCents, freeShippingThresholdCents)
+  const untilFreeShipping = amountUntilFreeShipping(subtotalCents, freeShippingThresholdCents)
 
   return (
     <div className="page cart-page notebook-page">
@@ -150,7 +159,9 @@ export default function Cart() {
                       {line.product.name}
                     </Link>
                     {optionsLabel && <p className="cart-item-options">{optionsLabel}</p>}
-                    <p className="cart-item-unit">{formatPrice(unitCents)} each</p>
+                    <p className="cart-item-unit">
+                      <Price cents={unitCents} /> each
+                    </p>
                     {line.product.trackStock === true && (
                       <p className="cart-item-stock">
                         {maxForProduct <= 0 ? 'Sold out' : `${maxForProduct} in stock`}
@@ -188,7 +199,9 @@ export default function Cart() {
                         +
                       </button>
                     </div>
-                    <p className="cart-item-total">{formatPrice(lineTotal)}</p>
+                    <p className="cart-item-total">
+                      <Price cents={lineTotal} />
+                    </p>
                   </div>
                 </li>
               )
@@ -204,15 +217,27 @@ export default function Cart() {
           <div className="cart-summary-section">
             <div className="cart-summary-row">
               <span>Subtotal</span>
-              <strong>{formatPrice(subtotalCents)}</strong>
+              <strong>
+                <Price cents={subtotalCents} />
+              </strong>
             </div>
             <div className="cart-summary-row">
               <span>Shipping</span>
-              <strong>Live at checkout</strong>
+              <strong>{freeShipping ? 'Free' : 'Calculated at checkout'}</strong>
             </div>
             <p className="cart-summary-note">
-              Address and Shippo rates are collected on the next screen (Untracked letter when eligible,
-              or Bubble mailer).
+              {freeShipping ?
+                'Your order qualifies for free shipping. Choose Untracked letter or Bubble mailer at checkout.'
+              : <>
+                  Free shipping on orders over <Price cents={freeShippingThresholdCents} />.
+                  {untilFreeShipping > 0 && (
+                    <>
+                      {' '}
+                      Add <Price cents={untilFreeShipping} /> more to qualify.
+                    </>
+                  )}
+                </>
+              }
             </p>
           </div>
 
@@ -238,9 +263,13 @@ export default function Cart() {
           {user && (
             <div className="cart-summary-section cart-summary-rewards">
               <p className="cart-summary-rewards-line">
-                <span>{rewards?.points ?? 0} points</span>
+                <span>
+                  <ReadableNumbers text={`${rewards?.points ?? 0}`} /> points
+                </span>
                 <span aria-hidden="true">·</span>
-                <span>Earn ~{potentialPoints} this order</span>
+                <span>
+                  Earn ~<ReadableNumbers text={String(potentialPoints)} /> this order
+                </span>
               </p>
 
               {rewards && rewards.activeRewards.length > 0 && !promoCode.trim() && (
@@ -257,9 +286,11 @@ export default function Cart() {
                   <span>
                     Apply{' '}
                     <strong>{selectedReward?.code ?? rewards.activeRewards[0]?.code}</strong> (
-                    {formatPrice(
-                      selectedReward?.discountCents ?? rewards.activeRewards[0]?.discountCents ?? 0,
-                    )}{' '}
+                    <Price
+                      cents={
+                        selectedReward?.discountCents ?? rewards.activeRewards[0]?.discountCents ?? 0
+                      }
+                    />{' '}
                     off)
                   </span>
                 </label>
@@ -267,8 +298,8 @@ export default function Cart() {
 
               {rewards && rewards.points < rewards.redeemPointsCost && (
                 <p className="cart-summary-note">
-                  <Link to="/account">Redeem points</Link> for coupons at {rewards.redeemPointsCost}{' '}
-                  points.
+                  <Link to="/account">Redeem points</Link> for coupons at{' '}
+                  <ReadableNumbers text={String(rewards.redeemPointsCost)} /> points.
                 </p>
               )}
             </div>

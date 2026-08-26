@@ -9,6 +9,7 @@ const {
   adminEmailsSecret,
   getAdminEmails,
   getClientUrl,
+  resolveCheckoutClientUrl,
   getProjectId,
   getStorageBucketName,
   getStripeSecretKey,
@@ -546,6 +547,7 @@ exports.quoteCheckoutShipping = onRequest(
         productTypes: catalog.productTypes,
         shippingTypes: catalog.shippingTypes,
         destination,
+        subtotalCents,
       })
 
       res.json({
@@ -560,6 +562,8 @@ exports.quoteCheckoutShipping = onRequest(
         recommendedRateId: quote.recommendedRateId,
         rates: quote.rates,
         subtotalCents,
+        freeShippingApplied: quote.freeShippingApplied,
+        freeShippingThresholdCents: quote.freeShippingThresholdCents,
         addressValidation: quote.addressValidation
           ? {
               isValid: quote.addressValidation.isValid,
@@ -697,7 +701,7 @@ exports.createCheckoutSession = onRequest(
 
     const lineItems = prepared.map((entry) => entry.stripeLine)
 
-    const clientUrl = getClientUrl(req.get('origin'))
+    const clientUrl = resolveCheckoutClientUrl(req)
     const decoded = await verifyOptionalAuthToken(req)
     const metadata = {
       source: 'okonani',
@@ -911,11 +915,20 @@ exports.updateCheckoutShipping = onRequest(
         }
       })
 
+      let subtotalCents = 0
+      for (const item of lineItems) {
+        const price = typeof item.price === 'object' && item.price ? item.price : null
+        if (price && typeof price.unit_amount === 'number') {
+          subtotalCents += price.unit_amount * (item.quantity || 1)
+        }
+      }
+
       const quote = await buildCheckoutShippingQuote({
         quoteLines,
         productTypes: catalog.productTypes,
         shippingTypes: catalog.shippingTypes,
         destination,
+        subtotalCents,
       })
 
       const shippingOptions = ratesToStripeShippingOptions(quote.rates)

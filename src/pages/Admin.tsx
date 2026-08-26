@@ -3,7 +3,8 @@ import { collection, doc } from 'firebase/firestore'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../data/categories'
-import { getProductCover, formatPrice, createMediaId, type ProductMedia } from '../data/products'
+import { getProductCover, createMediaId, type ProductMedia } from '../data/products'
+import { Price } from '../lib/readableNumbers'
 import {
   batchUpdateAdminProducts,
   deleteAdminProduct,
@@ -907,7 +908,9 @@ export default function Admin() {
                             </span>
                           </span>
                           <span className="admin-products-row-meta">
-                            <span>{formatPrice(product.priceInCents)}</span>
+                            <span>
+                              <Price cents={product.priceInCents} />
+                            </span>
                             {product.trackStock ?
                               <span>{product.stockQuantity} in stock</span>
                             : null}

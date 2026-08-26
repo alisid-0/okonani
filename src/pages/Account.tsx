@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import PageSheet from '../components/PageSheet'
 import { useAuth } from '../context/AuthContext'
-import { formatPrice } from '../data/products'
+import { Price, ReadableNumbers } from '../lib/readableNumbers'
 import { getUserProfile, setNotificationPreference } from '../lib/userApi'
 import { getRewardsSummary, redeemPoints, type RewardsSummary } from '../lib/rewardsApi'
 import { playUiSound, uiClick } from '../lib/uiSounds'
@@ -125,13 +125,16 @@ export default function Account() {
           <p className="account-copy">Loading rewards…</p>
         : <>
             <p className="account-points">
-              Balance: <strong>{rewards?.points ?? 0} points</strong>
+              Balance:{' '}
+              <strong>
+                <ReadableNumbers text={String(rewards?.points ?? 0)} /> points
+              </strong>
             </p>
 
             {rewards && (
               <p className="account-copy">
-                Redeem {rewards.redeemPointsCost} points for{' '}
-                {formatPrice(rewards.redeemDiscountCents)} off your next order.
+                Redeem <ReadableNumbers text={String(rewards.redeemPointsCost)} /> points for{' '}
+                <Price cents={rewards.redeemDiscountCents} /> off your next order.
               </p>
             )}
 
@@ -154,7 +157,7 @@ export default function Account() {
                 <ul>
                   {rewards.activeRewards.map((reward) => (
                     <li key={reward.id}>
-                      <code>{reward.code}</code> — {formatPrice(reward.discountCents)} off
+                      <code>{reward.code}</code> — <Price cents={reward.discountCents} /> off
                     </li>
                   ))}
                 </ul>

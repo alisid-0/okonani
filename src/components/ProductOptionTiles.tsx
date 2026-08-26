@@ -2,7 +2,7 @@ import {
   type ProductOptionChoice,
   type ProductOptionGroup,
 } from '../data/productOptions'
-import { formatPrice } from '../data/products'
+import { Price } from '../lib/readableNumbers'
 import { uiClick } from '../lib/uiSounds'
 
 type ProductOptionTilesProps = {
@@ -62,7 +62,7 @@ export default function ProductOptionTiles({
                     {choice.priceDeltaCents !== 0 && (
                       <span className="product-option-delta">
                         {choice.priceDeltaCents > 0 ? '+' : ''}
-                        {formatPrice(choice.priceDeltaCents)}
+                        <Price cents={choice.priceDeltaCents} />
                       </span>
                     )}
                   </span>

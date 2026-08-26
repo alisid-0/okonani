@@ -2,6 +2,36 @@ const { quoteShipping, decidePackaging, DEFAULT_LETTER_SETTINGS, bubbleMailerWei
 const { createShipmentRates, validateAddress } = require('./shippo')
 const { PACKAGE_DIMS } = require('./packaging')
 
+const DEFAULT_FREE_SHIPPING_THRESHOLD_CENTS = 5000
+
+function freeShippingThresholdFromCatalog(shippingTypes = []) {
+  const thresholds = shippingTypes
+    .filter(
+      (type) =>
+        type.active !== false &&
+        typeof type.freeAboveSubtotalCents === 'number' &&
+        type.freeAboveSubtotalCents > 0,
+    )
+    .map((type) => type.freeAboveSubtotalCents)
+
+  if (thresholds.length === 0) return DEFAULT_FREE_SHIPPING_THRESHOLD_CENTS
+  return Math.min(...thresholds)
+}
+
+function applyFreeShippingToRates(rates, subtotalCents, thresholdCents) {
+  if (!thresholdCents || subtotalCents < thresholdCents) {
+    return { rates, freeShippingApplied: false }
+  }
+
+  const freeRates = rates.map((rate) => ({
+    ...rate,
+    amountCents: 0,
+    service: /^free shipping/i.test(rate.service) ? rate.service : `Free shipping — ${rate.service}`,
+  }))
+
+  return { rates: freeRates, freeShippingApplied: true }
+}
+
 function parseDestinationAddress(raw) {
   if (!raw || typeof raw !== 'object') return null
 
@@ -81,6 +111,7 @@ async function buildCheckoutShippingQuote({
   shippingTypes,
   letterSettings,
   destination,
+  subtotalCents = 0,
   skipAddressValidation = false,
 }) {
   let addressValidation = null
@@ -232,14 +263,23 @@ async function buildCheckoutShippingQuote({
     throw error
   }
 
-  const recommendedRateId = letterAvailable ? 'untracked-letter' : rates[0]?.id || null
+  const freeShippingThresholdCents = freeShippingThresholdFromCatalog(shippingTypes)
+  const { rates: finalRates, freeShippingApplied } = applyFreeShippingToRates(
+    rates,
+    Math.max(0, Math.round(Number(subtotalCents) || 0)),
+    freeShippingThresholdCents,
+  )
+
+  const recommendedRateId = letterAvailable ? 'untracked-letter' : finalRates[0]?.id || null
 
   return {
     mode: letterAvailable ? 'letter_or_mailer' : 'shippo',
     packaging: letterAvailable ? letterEligiblePackaging : mailerPackaging,
     mailerPackaging,
     localQuote,
-    rates,
+    rates: finalRates,
+    freeShippingApplied,
+    freeShippingThresholdCents,
     recommendedRateId,
     shipmentId: shippo.shipmentId || null,
     message: letterAvailable
@@ -332,4 +372,7 @@ module.exports = {
   toStripeCollectedShippingDetails,
   pickCheckoutRate,
   letterSettingsFromCatalog,
+  freeShippingThresholdFromCatalog,
+  applyFreeShippingToRates,
+  DEFAULT_FREE_SHIPPING_THRESHOLD_CENTS,
 }

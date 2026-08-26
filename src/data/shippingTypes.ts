@@ -29,7 +29,7 @@ export const DEFAULT_SHIPPING_TYPES: Array<Omit<ShippingType, 'id'> & { id: stri
     postageMode: 'stamp',
     shipClass: 'letter',
     baseRateCents: 150,
-    freeAboveSubtotalCents: null,
+    freeAboveSubtotalCents: 5000,
     includedWeightOz: 3,
     overweightCentsPerOz: 0,
     maxWeightOz: 3,

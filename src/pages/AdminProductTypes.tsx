@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import ProductOptionsEditorModal from '../components/ProductOptionsEditorModal'
 import ProductShopperPreviewModal from '../components/ProductShopperPreviewModal'
-import { formatPrice } from '../data/products'
+import { Price } from '../lib/readableNumbers'
 import type { ProductOptionGroup } from '../data/productOptions'
 import type { ProductType } from '../data/productTypes'
 import {
@@ -244,7 +244,7 @@ export default function AdminProductTypes() {
                         </span>
                       </span>
                       <span className="admin-product-type-item-meta">
-                        {formatPrice(type.defaultPriceCents)}
+                        <Price cents={type.defaultPriceCents} />
                       </span>
                       <span className="admin-product-type-chips">
                         <span className="admin-product-type-chip">

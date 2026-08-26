@@ -2,11 +2,11 @@ import { Link } from 'react-router-dom'
 import ProtectedImage from './ProtectedImage'
 import {
   availableStock,
-  formatPrice,
   getProductCover,
   isProductSoldOut,
   type Product,
 } from '../data/products'
+import { Price, ReadableNumbers } from '../lib/readableNumbers'
 import { playUiSound, unlockUiSounds } from '../lib/uiSounds'
 
 type ProductCardProps = {
@@ -57,9 +57,13 @@ export default function ProductCard({ product, categoryName, onAdd }: ProductCar
 
         <div className="product-card-footer product-card-footer-inline">
           <div className="product-card-price-wrap">
-            <p className="product-card-price">{formatPrice(product.priceInCents)}</p>
+            <p className="product-card-price">
+              <Price cents={product.priceInCents} />
+            </p>
             {stock !== null && !soldOut && stock <= 5 && (
-              <p className="product-card-stock">{stock} left</p>
+              <p className="product-card-stock">
+                <ReadableNumbers text={`${stock}`} /> left
+              </p>
             )}
           </div>
           <button

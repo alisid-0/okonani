@@ -10,12 +10,12 @@ import { getCategoryName, useCategories } from '../data/categories'
 import {
   availableStock,
   averageRating,
-  formatPrice,
   indexOfMediaId,
   isProductSoldOut,
   useProduct,
   useProductReviews,
 } from '../data/products'
+import { Price, ReadableNumbers } from '../lib/readableNumbers'
 import {
   buildSelectedOptions,
   formatSelectedOptions,
@@ -202,12 +202,16 @@ export default function ProductDetail() {
             {product.description && <p className="product-detail-lead">{product.description}</p>}
 
             <div className="product-detail-price-row">
-              <p className="product-detail-price">{formatPrice(displayPriceCents)}</p>
+              <p className="product-detail-price">
+                <Price cents={displayPriceCents} />
+              </p>
               {rating != null && (
                 <div className="product-detail-rating">
                   <StarRating rating={rating} />
                   <span>
-                    {rating.toFixed(1)} · {reviews.length} review{reviews.length === 1 ? '' : 's'}
+                    <ReadableNumbers text={rating.toFixed(1)} /> ·{' '}
+                    <ReadableNumbers text={String(reviews.length)} /> review
+                    {reviews.length === 1 ? '' : 's'}
                   </span>
                 </div>
               )}
@@ -279,7 +283,9 @@ export default function ProductDetail() {
               <div className="product-reviews-summary">
                 <StarRating rating={rating} size="sm" />
                 <span>
-                  {rating.toFixed(1)} average from {reviews.length} review{reviews.length === 1 ? '' : 's'}
+                  <ReadableNumbers text={rating.toFixed(1)} /> average from{' '}
+                  <ReadableNumbers text={String(reviews.length)} /> review
+                  {reviews.length === 1 ? '' : 's'}
                 </span>
               </div>
             )}

@@ -4,6 +4,7 @@ import SiteOffline from './SiteOffline'
 
 import Footer from './Footer'
 
+import FreeShippingBanner from './FreeShippingBanner'
 import Header from './Header'
 
 import { useSiteSettings } from '../data/siteSettings'
@@ -28,7 +29,10 @@ export default function Layout() {
 
   return (
     <div className="site">
-      <Header />
+      <div className="site-top">
+        <FreeShippingBanner />
+        <Header />
+      </div>
 
       <main className={mainClassName}>
         <Outlet />

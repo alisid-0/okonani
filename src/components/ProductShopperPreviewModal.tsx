@@ -12,7 +12,8 @@ import {
   type ProductOptionGroup,
   type SelectedProductOption,
 } from '../data/productOptions'
-import { formatPrice, indexOfMediaId, type Product } from '../data/products'
+import { indexOfMediaId, type Product } from '../data/products'
+import { Price } from '../lib/readableNumbers'
 import { playUiSound, uiClick } from '../lib/uiSounds'
 
 type ProductShopperPreviewModalProps = {
@@ -113,7 +114,9 @@ export default function ProductShopperPreviewModal({
           <p className="admin-shopper-preview-eyebrow">What shoppers see</p>
           <h3>{productName || 'Untitled product'}</h3>
           {description?.trim() && <p className="admin-shopper-preview-lead">{description.trim()}</p>}
-          <p className="admin-shopper-preview-price">{formatPrice(totalCents)}</p>
+          <p className="admin-shopper-preview-price">
+            <Price cents={totalCents} />
+          </p>
 
           {shopperGroups.length === 0 ?
             <p className="admin-field-hint">

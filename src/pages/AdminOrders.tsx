@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { getProductCover, formatPrice } from '../data/products'
+import { Price } from '../lib/readableNumbers'
+import { getProductCover } from '../data/products'
 import { resolveProductOptionGroups } from '../data/productOptions'
 import {
   getAdminOrderRates,
@@ -450,7 +451,7 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                     {order.shippingAddress?.name || order.customerName || order.email || 'Guest order'}
                   </strong>
                   <span>
-                    {formatPrice(order.amountTotal)} · {order.fulfillmentStatus}
+                    <Price cents={order.amountTotal} /> · {order.fulfillmentStatus}
                   </span>
                   <span>
                     {order.email || 'No email'} · {formatOrderDate(order.createdAt)}
@@ -476,7 +477,7 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                   </h2>
                   <p className="admin-meta">
                     {selected.email || 'No email'} · {formatOrderDate(selected.createdAt)} ·{' '}
-                    {selected.fulfillmentStatus} · {formatPrice(selected.amountTotal)}
+                    {selected.fulfillmentStatus} · <Price cents={selected.amountTotal} />
                   </p>
                 </div>
                 {selected.labelUrl && (
@@ -500,7 +501,7 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                     <p className="admin-meta">
                       Paid shipping: {selected.shippingRateName}
                       {typeof selected.shippingAmountCents === 'number'
-                        ? ` (${formatPrice(selected.shippingAmountCents)})`
+                        ? <> (<Price cents={selected.shippingAmountCents} />)</>
                         : ''}
                     </p>
                   )}
@@ -533,7 +534,9 @@ export default function AdminOrders({ initialOrderId = null }: { initialOrderId?
                         <div className="admin-orders-line-copy">
                           <p className="admin-orders-line-title">
                             {item.quantity} × {item.name}{' '}
-                            <span>{formatPrice(item.amountCents)}</span>
+                            <span>
+                              <Price cents={item.amountCents} />
+                            </span>
                           </p>
                           {item.options.length > 0 && (
                             <ul className="admin-orders-item-options">
